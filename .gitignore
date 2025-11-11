@@ -223,6 +223,10 @@ local/
 *.local.sh
 *.dev.sh
 
+# Local Claude
+.claude/
+CLAUDE.md
+
 # Documentation builds
 docs/_build/
 docs/.doctrees/

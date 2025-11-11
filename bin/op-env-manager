@@ -35,19 +35,29 @@ COMMANDS:
     push        Push local .env file to 1Password vault
     inject      Inject secrets from 1Password to local .env file
     run         Run command with secrets injected from 1Password
+    convert     Convert .env files with op:// references to op-env-manager format
     init        Initialize 1Password vault structure (coming soon)
     version     Show version information
     help        Show this help message
 
 EXAMPLES:
     # Push .env to 1Password
-    op-env-manager push --vault "Personal" --env .env.production
+    op-env-manager push --vault="Personal" --env-file=.env.production
+
+    # Push with environment section
+    op-env-manager push --vault="Projects" --item="myapp" --section="dev" --env-file=.env.dev
 
     # Inject secrets from 1Password to local .env
-    op-env-manager inject --vault "Personal" --output .env.local
+    op-env-manager inject --vault="Personal" --output=.env.local
+
+    # Inject with environment section
+    op-env-manager inject --vault="Projects" --item="myapp" --section="prod" --output=.env.prod
 
     # Run command with injected secrets
-    op-env-manager run --vault "Personal" --item "myapp" -- docker compose up
+    op-env-manager run --vault="Personal" --item="myapp" --section="dev" -- docker compose up
+
+    # Convert legacy .env with op:// references
+    op-env-manager convert --vault="Personal" --item="myapp" --env-file=.env.template
 
     # Show help for specific command
     op-env-manager push --help
@@ -81,22 +91,48 @@ show_version() {
 run_with_secrets() {
     local vault=""
     local item="env-secrets"
+    local section=""
     local env_file=""
+    local dry_run=false
 
     # Parse arguments until we hit --
     while [[ $# -gt 0 ]]; do
         case $1 in
+            --vault=*)
+                vault="${1#*=}"
+                shift
+                ;;
             --vault)
                 vault="$2"
                 shift 2
+                ;;
+            --item=*)
+                item="${1#*=}"
+                shift
                 ;;
             --item)
                 item="$2"
                 shift 2
                 ;;
+            --section=*)
+                section="${1#*=}"
+                shift
+                ;;
+            --section)
+                section="$2"
+                shift 2
+                ;;
+            --env-file=*)
+                env_file="${1#*=}"
+                shift
+                ;;
             --env-file)
                 env_file="$2"
                 shift 2
+                ;;
+            --dry-run)
+                dry_run=true
+                shift
                 ;;
             --)
                 shift
@@ -105,7 +141,7 @@ run_with_secrets() {
             *)
                 log_error "Unknown option for run command: $1"
                 echo ""
-                echo "Usage: op-env-manager run --vault VAULT [--item ITEM] [--env-file FILE] -- <command>"
+                echo "Usage: op-env-manager run --vault=VAULT [--item=ITEM] [--section=SECTION] [--env-file=FILE] [--dry-run] -- <command>"
                 exit 1
                 ;;
         esac
@@ -116,10 +152,10 @@ run_with_secrets() {
         exit 1
     fi
 
-    if [ $# -eq 0 ]; then
+    if [ "$dry_run" = false ] && [ $# -eq 0 ]; then
         log_error "No command provided after --"
         echo ""
-        echo "Usage: op-env-manager run --vault VAULT -- <command>"
+        echo "Usage: op-env-manager run --vault=VAULT [--item=ITEM] [--section=SECTION] [--env-file=FILE] -- <command>"
         exit 1
     fi
 
@@ -133,7 +169,10 @@ run_with_secrets() {
     log_header "Running Command with 1Password Secrets"
     echo ""
     log_info "Vault: $vault"
-    log_info "Item prefix: $item"
+    log_info "Item: $item"
+    if [ -n "$section" ]; then
+        log_info "Section: $section (will use \$APP_ENV variable)"
+    fi
     log_info "Command: $*"
     echo ""
 
@@ -142,34 +181,63 @@ run_with_secrets() {
     temp_env=$(mktemp)
     trap 'rm -f "$temp_env"' EXIT
 
-    # Get items and create op:// references
+    # Get item to retrieve field names
     log_step "Building secret references..."
-    local items
-    items=$(op item list --vault "$vault" --tags "op-env-manager,${item}" --format json 2>/dev/null)
+    local item_json
+    item_json=$(op item get "$item" --vault "$vault" --format json 2>/dev/null)
 
-    if [ -z "$items" ] || [ "$items" = "[]" ]; then
-        log_error "No items found in vault with prefix: $item"
+    if [ -z "$item_json" ]; then
+        log_error "Item not found: $item"
         log_info "Push your .env file first:"
-        echo "  op-env-manager push --vault \"$vault\" --item \"$item\""
+        if [ -n "$section" ]; then
+            echo "  op-env-manager push --vault=\"$vault\" --item=\"$item\" --section=\"$section\""
+        else
+            echo "  op-env-manager push --vault=\"$vault\" --item=\"$item\""
+        fi
         exit 1
     fi
 
-    echo "$items" | jq -r '.[].title' | while IFS= read -r item_title; do
-        local key="${item_title#${item}-}"
-        local op_ref="op://${vault}/${item_title}/password"
-        echo "${key}=${op_ref}" >> "$temp_env"
-    done
+    # Build secret references
+    if [ -n "$section" ]; then
+        # Use $APP_ENV variable in references for dynamic section selection
+        echo "$item_json" | jq -r ".fields[] | select(.section.label == \"$section\") | .label" | while IFS= read -r field_name; do
+            echo "${field_name}=op://${vault}/${item}/\$APP_ENV/${field_name}" >> "$temp_env"
+        done
+
+        # Set APP_ENV for this execution
+        export APP_ENV="$section"
+        log_info "Set APP_ENV=$section"
+    else
+        # No section - reference fields directly
+        echo "$item_json" | jq -r '.fields[] | select(.section == null) | .label' | while IFS= read -r field_name; do
+            echo "${field_name}=op://${vault}/${item}/${field_name}" >> "$temp_env"
+        done
+    fi
 
     log_success "Secret references created"
     echo ""
-    log_step "Executing command with secrets..."
-    echo ""
 
-    # Use op run to inject secrets
-    if [ -n "$env_file" ]; then
-        op run --env-file="$temp_env" --env-file="$env_file" -- "$@"
+    if [ "$dry_run" = true ]; then
+        log_warning "DRY RUN: Preview of secret references that would be used:"
+        echo ""
+        cat "$temp_env"
+        echo ""
+        if [ -n "$env_file" ]; then
+            log_info "Would also load additional env file: $env_file"
+        fi
+        log_info "Would execute command: $*"
+        echo ""
+        log_warning "Remove --dry-run and add -- <command> to actually run"
     else
-        op run --env-file="$temp_env" -- "$@"
+        log_step "Executing command with secrets..."
+        echo ""
+
+        # Use op run to inject secrets
+        if [ -n "$env_file" ]; then
+            op run --env-file="$temp_env" --env-file="$env_file" -- "$@"
+        else
+            op run --env-file="$temp_env" -- "$@"
+        fi
     fi
 }
 
@@ -204,6 +272,10 @@ main() {
             ;;
         run)
             run_with_secrets "$@"
+            ;;
+        convert)
+            source "$LIB_DIR/convert.sh"
+            main "$@"
             ;;
         init)
             init_vault "$@"

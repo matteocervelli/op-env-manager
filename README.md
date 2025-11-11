@@ -16,6 +16,7 @@ by [Matteo Cervelli](https://github.com/matteocervelli)
 - **Push**: Upload your `.env` variables to 1Password for secure storage
 - **Inject**: Download secrets from 1Password into local `.env` files
 - **Run**: Execute commands with secrets injected from 1Password (no plaintext files!)
+- **Convert**: Migrate legacy `.env` files with `op://` references to op-env-manager format
 
 Stop committing secrets to git. Stop sharing `.env` files over Slack. Use 1Password.
 
@@ -195,6 +196,37 @@ Examples:
   op-env-manager run --vault "Staging" -- python manage.py migrate
 ```
 
+#### `convert` - Migrate from op:// reference format
+
+```bash
+op-env-manager convert --vault VAULT --env FILE [options]
+
+Options:
+  --env FILE          .env file with op:// references (required)
+  --vault VAULT       Target 1Password vault name (required)
+  --item NAME         Target item name prefix (default: env-secrets)
+  --section SECTION   Environment section (e.g., dev, prod)
+  --dry-run           Preview without converting
+
+Examples:
+  # Convert legacy .env.template with op:// references
+  op-env-manager convert --vault "Personal" --env .env.template --item "myapp"
+
+  # Convert with environment section
+  op-env-manager convert --vault "Personal" --env .env.prod.template --item "myapp" --section "prod"
+
+  # Preview conversion
+  op-env-manager convert --vault "Personal" --env .env.template --dry-run
+
+What it does:
+  1. Parses .env file with op://vault/item/field references
+  2. Resolves each reference using 'op read'
+  3. Creates Secure Note with resolved values
+  4. No temporary plaintext files created
+
+See: docs/1password-formats.md for detailed format comparison
+```
+
 ## Workflows
 
 ### Development Team Workflow
@@ -248,6 +280,35 @@ op-env-manager run --vault "CI-Secrets" -- npm test
 ```
 
 See [1Password Service Accounts docs](https://developer.1password.com/docs/service-accounts/).
+
+### Migrating from op:// References
+
+If you have existing `.env` files with 1Password secret references (`op://vault/item/field`), use the convert command:
+
+```bash
+# You have: .env.template with op:// references
+# Example: API_KEY=op://Production/api-keys/stripe_key
+
+# Convert to op-env-manager format
+op-env-manager convert \
+  --env .env.template \
+  --vault "Production" \
+  --item "myapp"
+
+# Now use op-env-manager commands
+op-env-manager run --vault "Production" --item "myapp" -- docker compose up
+
+# Old workflow still works (both formats can coexist)
+op run --env-file=.env.template -- docker compose up
+```
+
+**Why convert?**
+- Automated item management (no manual creation)
+- Bidirectional sync (push updates back)
+- Organized in single Secure Note per environment
+- Team-friendly structure
+
+See [docs/1password-formats.md](docs/1password-formats.md) for detailed comparison of the two formats.
 
 ## Best Practices
 
@@ -336,9 +397,12 @@ op-env-manager/
 ├── lib/
 │   ├── logger.sh               # Logging utilities
 │   ├── push.sh                 # Push command
-│   └── inject.sh               # Inject command
+│   ├── inject.sh               # Inject command
+│   └── convert.sh              # Convert command
 ├── docs/
 │   ├── 1PASSWORD_SETUP.md      # 1Password CLI setup guide
+│   ├── 1password-formats.md    # Format comparison guide
+│   ├── CONVERT_TESTING.md      # Convert command testing guide
 │   └── QUICKSTART.md           # Quick reference
 ├── examples/
 │   └── .env.example            # Example .env file

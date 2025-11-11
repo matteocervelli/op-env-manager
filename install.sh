@@ -110,42 +110,48 @@ install_files() {
     log_header "Installing op-env-manager"
 
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local target_dir="$INSTALL_DIR/op-env-manager"
+    local install_subdir="$INSTALL_DIR/op-env-manager-install"
+    local symlink_path="$INSTALL_DIR/op-env-manager"
 
-    # Create target directory
-    if [ -d "$target_dir" ]; then
-        log_warning "Target directory already exists: $target_dir"
+    # Remove existing installation and symlink
+    if [ -d "$install_subdir" ]; then
+        log_warning "Installation directory already exists: $install_subdir"
         read -rp "Overwrite? (y/n): " response
         if [ "$response" != "y" ]; then
             log_info "Installation cancelled"
             exit 0
         fi
-        rm -rf "$target_dir"
+        rm -rf "$install_subdir"
     fi
 
-    mkdir -p "$target_dir"
-    log_info "Installing to: $target_dir"
+    # Remove any existing symlink or file at symlink path
+    if [ -L "$symlink_path" ] || [ -f "$symlink_path" ]; then
+        rm -f "$symlink_path"
+    fi
+
+    # Remove directory if it exists at symlink path (from previous buggy install)
+    if [ -d "$symlink_path" ]; then
+        log_warning "Found directory at symlink path (from old install): $symlink_path"
+        rm -rf "$symlink_path"
+    fi
+
+    mkdir -p "$install_subdir"
+    log_info "Installing to: $install_subdir"
 
     # Copy files
-    cp -r "$script_dir/bin" "$target_dir/"
-    cp -r "$script_dir/lib" "$target_dir/"
-    cp -r "$script_dir/docs" "$target_dir/" 2>/dev/null || true
+    cp -r "$script_dir/bin" "$install_subdir/"
+    cp -r "$script_dir/lib" "$install_subdir/"
+    cp -r "$script_dir/docs" "$install_subdir/" 2>/dev/null || true
 
     # Set permissions
-    chmod +x "$target_dir/bin/op-env-manager"
-    chmod +x "$target_dir/lib/"*.sh
+    chmod +x "$install_subdir/bin/op-env-manager"
+    chmod +x "$install_subdir/lib/"*.sh
 
     log_success "Files installed successfully"
 
     # Create symlink
     if [ "$CREATE_SYMLINK" = true ]; then
-        local symlink_path="$INSTALL_DIR/op-env-manager"
-
-        if [ -L "$symlink_path" ] || [ -f "$symlink_path" ]; then
-            rm -f "$symlink_path"
-        fi
-
-        ln -s "$target_dir/bin/op-env-manager" "$symlink_path"
+        ln -s "$install_subdir/bin/op-env-manager" "$symlink_path"
         log_success "Symlink created: $symlink_path"
     fi
 
@@ -233,7 +239,7 @@ show_completion() {
     echo "  op-env-manager inject --vault \"Personal\" --output .env.local"
     echo ""
 
-    log_info "Documentation: $INSTALL_DIR/op-env-manager/docs/"
+    log_info "Documentation: $INSTALL_DIR/op-env-manager-install/docs/"
     echo ""
 }
 
