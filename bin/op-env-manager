@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+# op-env-manager - Bidirectional environment variable sync with 1Password
+# by Matteo Cervelli (https://github.com/matteocervelli/op-env-manager)
+
+set -eo pipefail
+
+# Detect installation directory
+if [ -L "${BASH_SOURCE[0]}" ]; then
+    # If symlinked, follow to actual location
+    INSTALL_DIR="$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}")")" && pwd)"
+else
+    INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
+# Project root is parent of bin/
+PROJECT_ROOT="$(cd "$INSTALL_DIR/.." && pwd)"
+LIB_DIR="$PROJECT_ROOT/lib"
+
+# Source utilities
+source "$LIB_DIR/logger.sh"
+
+# Version
+VERSION="0.1.0"
+
+# Show main usage
+usage() {
+    cat << EOF
+op-env-manager v${VERSION}
+Bidirectional environment variable sync with 1Password
+
+USAGE:
+    op-env-manager <command> [options]
+
+COMMANDS:
+    push        Push local .env file to 1Password vault
+    inject      Inject secrets from 1Password to local .env file
+    run         Run command with secrets injected from 1Password
+    init        Initialize 1Password vault structure (coming soon)
+    version     Show version information
+    help        Show this help message
+
+EXAMPLES:
+    # Push .env to 1Password
+    op-env-manager push --vault "Personal" --env .env.production
+
+    # Inject secrets from 1Password to local .env
+    op-env-manager inject --vault "Personal" --output .env.local
+
+    # Run command with injected secrets
+    op-env-manager run --vault "Personal" --item "myapp" -- docker compose up
+
+    # Show help for specific command
+    op-env-manager push --help
+
+GLOBAL OPTIONS:
+    -h, --help      Show help
+    -v, --version   Show version
+
+For more information and documentation:
+    https://github.com/matteocervelli/op-env-manager
+
+EOF
+    exit 0
+}
+
+# Show version
+show_version() {
+    echo "op-env-manager v${VERSION}"
+    echo "by Matteo Cervelli"
+    echo ""
+    echo "1Password CLI version:"
+    if command -v op &> /dev/null; then
+        op --version
+    else
+        echo "  Not installed (required)"
+    fi
+    exit 0
+}
+
+# Run command with injected secrets
+run_with_secrets() {
+    local vault=""
+    local item="env-secrets"
+    local env_file=""
+
+    # Parse arguments until we hit --
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --vault)
+                vault="$2"
+                shift 2
+                ;;
+            --item)
+                item="$2"
+                shift 2
+                ;;
+            --env-file)
+                env_file="$2"
+                shift 2
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                log_error "Unknown option for run command: $1"
+                echo ""
+                echo "Usage: op-env-manager run --vault VAULT [--item ITEM] [--env-file FILE] -- <command>"
+                exit 1
+                ;;
+        esac
+    done
+
+    if [ -z "$vault" ]; then
+        log_error "--vault is required for run command"
+        exit 1
+    fi
+
+    if [ $# -eq 0 ]; then
+        log_error "No command provided after --"
+        echo ""
+        echo "Usage: op-env-manager run --vault VAULT -- <command>"
+        exit 1
+    fi
+
+    # Check if 1Password CLI is installed
+    if ! command -v op &> /dev/null; then
+        log_error "1Password CLI (op) is not installed"
+        log_info "See installation guide: docs/1PASSWORD_SETUP.md"
+        exit 1
+    fi
+
+    log_header "Running Command with 1Password Secrets"
+    echo ""
+    log_info "Vault: $vault"
+    log_info "Item prefix: $item"
+    log_info "Command: $*"
+    echo ""
+
+    # Create temporary .env file with secret references
+    local temp_env
+    temp_env=$(mktemp)
+    trap 'rm -f "$temp_env"' EXIT
+
+    # Get items and create op:// references
+    log_step "Building secret references..."
+    local items
+    items=$(op item list --vault "$vault" --tags "op-env-manager,${item}" --format json 2>/dev/null)
+
+    if [ -z "$items" ] || [ "$items" = "[]" ]; then
+        log_error "No items found in vault with prefix: $item"
+        log_info "Push your .env file first:"
+        echo "  op-env-manager push --vault \"$vault\" --item \"$item\""
+        exit 1
+    fi
+
+    echo "$items" | jq -r '.[].title' | while IFS= read -r item_title; do
+        local key="${item_title#${item}-}"
+        local op_ref="op://${vault}/${item_title}/password"
+        echo "${key}=${op_ref}" >> "$temp_env"
+    done
+
+    log_success "Secret references created"
+    echo ""
+    log_step "Executing command with secrets..."
+    echo ""
+
+    # Use op run to inject secrets
+    if [ -n "$env_file" ]; then
+        op run --env-file="$temp_env" --env-file="$env_file" -- "$@"
+    else
+        op run --env-file="$temp_env" -- "$@"
+    fi
+}
+
+# Init command (placeholder for future)
+init_vault() {
+    log_header "Initialize 1Password Vault Structure"
+    echo ""
+    log_warning "This feature is coming soon!"
+    echo ""
+    log_info "For now, just push your .env file to create the structure:"
+    echo "  op-env-manager push --vault \"YourVault\" --env .env"
+    exit 0
+}
+
+# Main command dispatcher
+main() {
+    if [ $# -eq 0 ]; then
+        usage
+    fi
+
+    local command="$1"
+    shift
+
+    case "$command" in
+        push)
+            source "$LIB_DIR/push.sh"
+            main "$@"
+            ;;
+        inject)
+            source "$LIB_DIR/inject.sh"
+            main "$@"
+            ;;
+        run)
+            run_with_secrets "$@"
+            ;;
+        init)
+            init_vault "$@"
+            ;;
+        version|-v|--version)
+            show_version
+            ;;
+        help|-h|--help)
+            usage
+            ;;
+        *)
+            log_error "Unknown command: $command"
+            echo ""
+            usage
+            ;;
+    esac
+}
+
+# Run main
+main "$@"
