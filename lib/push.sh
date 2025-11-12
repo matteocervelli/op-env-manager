@@ -139,9 +139,9 @@ push_to_1password() {
         while IFS='=' read -r key value; do
             if [ -n "$key" ]; then
                 if [ -n "$SECTION" ]; then
-                    log_info "[DRY RUN] Would set: $SECTION.$key[password]"
+                    log_info "[DRY RUN] Would set: ${SECTION}.${key}[password]"
                 else
-                    log_info "[DRY RUN] Would set: $key[password]"
+                    log_info "[DRY RUN] Would set: ${key}[password]"
                 fi
                 ((count++))
             fi
