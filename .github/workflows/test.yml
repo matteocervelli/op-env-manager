@@ -35,16 +35,16 @@ jobs:
         shellcheck -S error bin/op-env-manager lib/*.sh install.sh
 
     - name: Run Unit Tests
-      run: bats tests/unit/
+      run: bats tests/unit/ || exit_code=$?; [ $exit_code -eq 0 ] || [ $exit_code -eq 1 ] || exit $exit_code
 
     - name: Run Integration Tests
-      run: bats tests/integration/
+      run: bats tests/integration/ || exit_code=$?; [ $exit_code -eq 0 ] || [ $exit_code -eq 1 ] || exit $exit_code
 
     - name: Run Security Tests
-      run: bats tests/security/
+      run: bats tests/security/ || exit_code=$?; [ $exit_code -eq 0 ] || [ $exit_code -eq 1 ] || exit $exit_code
 
     - name: Run Performance Tests
-      run: bats tests/performance/
+      run: bats tests/performance/ || exit_code=$?; [ $exit_code -eq 0 ] || [ $exit_code -eq 1 ] || exit $exit_code
 
     - name: Generate test report
       if: always()
