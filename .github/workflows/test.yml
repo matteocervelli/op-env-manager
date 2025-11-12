@@ -8,22 +8,32 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v3
       with:
         submodules: recursive
 
-    - name: Install dependencies
+    - name: Install dependencies (Ubuntu)
+      if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y bats jq
+        sudo apt-get install -y bats jq kcov
+
+    - name: Install dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install bats-core jq
+        # Note: kcov is not available on macOS, coverage will only work on Linux
 
     - name: Run Unit Tests
       run: bats tests/unit/
 
-    - name: Run Integration Tests  
+    - name: Run Integration Tests
       run: bats tests/integration/
 
     - name: Run Security Tests
@@ -32,5 +42,16 @@ jobs:
     - name: Run Performance Tests
       run: bats tests/performance/
 
-    - name: Run All Tests
-      run: bats tests/
+    - name: Run All Tests with Coverage (Linux only)
+      if: runner.os == 'Linux'
+      run: |
+        mkdir -p coverage
+        kcov --exclude-pattern=/usr/share,/tmp,test_helper coverage bats tests/
+
+    - name: Upload coverage to Codecov
+      if: runner.os == 'Linux'
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage/bats/cobertura.xml
+        flags: bats-tests
+        name: bats-coverage

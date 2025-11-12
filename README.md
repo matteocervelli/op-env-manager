@@ -5,6 +5,8 @@
 by [Matteo Cervelli](https://github.com/matteocervelli)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Test Suite](https://github.com/matteocervelli/tool-op-env-manager/actions/workflows/test.yml/badge.svg)](https://github.com/matteocervelli/tool-op-env-manager/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/matteocervelli/tool-op-env-manager/branch/main/graph/badge.svg)](https://codecov.io/gh/matteocervelli/tool-op-env-manager)
 [![1Password CLI](https://img.shields.io/badge/1Password-CLI-blue.svg)](https://developer.1password.com/docs/cli/)
 [![Buy Me A Coffee](https://img.shields.io/badge/☕-Buy%20me%20a%20coffee-orange.svg)](https://adli.men/coffee)
 
