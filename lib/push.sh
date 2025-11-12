@@ -75,6 +75,14 @@ check_op_cli() {
 }
 
 # Parse .env file and extract variables
+# Supports:
+# - Single-line values: KEY=value
+# - Quoted values: KEY="value with spaces"
+# - Multiline quoted values: KEY="line1
+#   line2"
+# - Comments (lines starting with #)
+# - Empty lines
+# Multiline values are converted to \n escape sequences for storage
 parse_env_file() {
     local env_file="$1"
 
@@ -83,22 +91,90 @@ parse_env_file() {
         exit 1
     fi
 
-    # Parse .env file, ignore comments and empty lines
-    grep -v '^\s*#' "$env_file" | grep -v '^\s*$' | while IFS='=' read -r key value; do
-        # Trim whitespace
-        key=$(echo "$key" | xargs)
-        value=$(echo "$value" | xargs)
+    # Use awk for robust multiline parsing (portable POSIX awk)
+    awk '
+    BEGIN {
+        in_value = 0
+        current_key = ""
+        current_value = ""
+    }
 
-        # Remove quotes from value if present
-        value="${value%\"}"
-        value="${value#\"}"
-        value="${value%\'}"
-        value="${value#\'}"
+    # Skip empty lines and comments when not in multiline value
+    !in_value && /^[[:space:]]*$/ { next }
+    !in_value && /^[[:space:]]*#/ { next }
 
-        if [ -n "$key" ]; then
-            echo "$key=$value"
-        fi
-    done
+    # Start of new key=value pair (allow leading whitespace)
+    !in_value && /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/ {
+        # Extract key and initial value using index and substr
+        eq_pos = index($0, "=")
+        current_key = substr($0, 1, eq_pos - 1)
+        current_value = substr($0, eq_pos + 1)
+
+        # Trim leading/trailing whitespace from key
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", current_key)
+
+        # Trim leading whitespace from value
+        gsub(/^[[:space:]]+/, "", current_value)
+
+        # Check if value starts with a double quote
+        if (substr(current_value, 1, 1) == "\"") {
+            # Remove opening quote
+            current_value = substr(current_value, 2)
+
+            # Check if value ends with closing quote (single-line quoted value)
+            if (match(current_value, /"[[:space:]]*$/)) {
+                # Remove trailing quote and whitespace
+                sub(/"[[:space:]]*$/, "", current_value)
+                print current_key "=" current_value
+                current_key = ""
+                current_value = ""
+            } else {
+                # Start of multiline quoted value
+                in_value = 1
+            }
+        } else {
+            # Unquoted value - trim trailing whitespace
+            gsub(/[[:space:]]+$/, "", current_value)
+            # Remove surrounding single quotes if present
+            if (substr(current_value, 1, 1) == "'"'"'" && substr(current_value, length(current_value), 1) == "'"'"'") {
+                current_value = substr(current_value, 2, length(current_value) - 2)
+            }
+            print current_key "=" current_value
+            current_key = ""
+            current_value = ""
+        }
+        next
+    }
+
+    # Continue reading multiline value
+    in_value {
+        # Check if this line contains closing quote
+        if (match($0, /"[[:space:]]*$/)) {
+            # Remove trailing quote and whitespace
+            line = $0
+            sub(/"[[:space:]]*$/, "", line)
+            # Append line with \n escape sequence
+            if (current_value != "") {
+                current_value = current_value "\\n" line
+            } else {
+                current_value = line
+            }
+            # Output the complete key=value pair
+            print current_key "=" current_value
+            in_value = 0
+            current_key = ""
+            current_value = ""
+        } else {
+            # Append line with \n escape sequence
+            if (current_value != "") {
+                current_value = current_value "\\n" $0
+            } else {
+                current_value = $0
+            }
+        }
+        next
+    }
+    ' "$env_file"
 }
 
 # Push variables to 1Password

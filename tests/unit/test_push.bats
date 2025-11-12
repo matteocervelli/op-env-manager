@@ -125,10 +125,160 @@ EOF
     local env_file
     env_file=$(mktemp -p "$TEST_TEMP_DIR")
     echo 'DATABASE_URL=postgresql://user:pass@localhost:5432/db?sslmode=require' > "$env_file"
-    
+
     run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file'"
     assert_success
     assert_output "DATABASE_URL=postgresql://user:pass@localhost:5432/db?sslmode=require"
+}
+
+# =============================================================================
+# Test: Multiline Value Support
+# =============================================================================
+
+@test "parse_env_file handles simple multiline quoted value" {
+    local env_file
+    env_file=$(mktemp -p "$TEST_TEMP_DIR")
+    cat > "$env_file" << 'EOF'
+PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA
+-----END RSA PRIVATE KEY-----"
+EOF
+
+    run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file'"
+    assert_success
+    assert_output "PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA\n-----END RSA PRIVATE KEY-----"
+}
+
+@test "parse_env_file handles multiline value with mixed content before and after" {
+    local env_file
+    env_file=$(mktemp -p "$TEST_TEMP_DIR")
+    cat > "$env_file" << 'EOF'
+API_KEY=simple_key
+CERT="-----BEGIN CERTIFICATE-----
+line1
+line2
+-----END CERTIFICATE-----"
+DATABASE_URL=postgresql://localhost/db
+EOF
+
+    run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file'"
+    assert_success
+    assert_line --index 0 "API_KEY=simple_key"
+    assert_line --index 1 "CERT=-----BEGIN CERTIFICATE-----\nline1\nline2\n-----END CERTIFICATE-----"
+    assert_line --index 2 "DATABASE_URL=postgresql://localhost/db"
+}
+
+@test "parse_env_file handles multiline value with empty lines inside quotes" {
+    local env_file
+    env_file=$(mktemp -p "$TEST_TEMP_DIR")
+    cat > "$env_file" << 'EOF'
+JSON_CONFIG="{
+  \"key\": \"value\",
+
+  \"another\": \"value\"
+}"
+EOF
+
+    run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file'"
+    assert_success
+    # Should contain \n escape sequences
+    assert_output --regexp "JSON_CONFIG=.*\\\\n.*\\\\n.*"
+}
+
+@test "parse_env_file handles multiline value with special characters" {
+    local env_file
+    env_file=$(mktemp -p "$TEST_TEMP_DIR")
+    cat > "$env_file" << 'EOF'
+SSH_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC
+test@example.com
+with special chars: !@#$%^&*()"
+EOF
+
+    run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file'"
+    assert_success
+    assert_output --regexp "SSH_KEY=ssh-rsa.*\\\\n.*test@example.com.*\\\\n.*special chars"
+}
+
+@test "parse_env_file ignores comments between variables with multiline values" {
+    local env_file
+    env_file=$(mktemp -p "$TEST_TEMP_DIR")
+    cat > "$env_file" << 'EOF'
+# Comment before
+KEY1="line1
+line2"
+# Comment after
+KEY2=simple
+EOF
+
+    run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file'"
+    assert_success
+    assert_line --index 0 "KEY1=line1\nline2"
+    assert_line --index 1 "KEY2=simple"
+    refute_output --regexp "Comment"
+}
+
+@test "parse_env_file handles multiple consecutive multiline values" {
+    local env_file
+    env_file=$(mktemp -p "$TEST_TEMP_DIR")
+    cat > "$env_file" << 'EOF'
+CERT1="-----BEGIN CERT-----
+data1
+-----END CERT-----"
+CERT2="-----BEGIN CERT-----
+data2
+-----END CERT-----"
+EOF
+
+    run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file'"
+    assert_success
+    [ "$(echo "$output" | wc -l)" -eq 2 ]
+    assert_line --index 0 --regexp "CERT1=.*\\\\n.*data1.*\\\\n.*"
+    assert_line --index 1 --regexp "CERT2=.*\\\\n.*data2.*\\\\n.*"
+}
+
+@test "parse_env_file handles multiline value with tabs and spaces" {
+    local env_file
+    env_file=$(mktemp -p "$TEST_TEMP_DIR")
+    cat > "$env_file" << 'EOF'
+INDENTED="line with spaces
+	line with tab
+  line with multiple spaces"
+EOF
+
+    run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file'"
+    assert_success
+    # Should preserve internal whitespace
+    assert_output --regexp "INDENTED=line with spaces\\\\n.*line with tab\\\\n.*line with multiple spaces"
+}
+
+@test "parse_env_file handles quoted single-line value (backward compatibility)" {
+    local env_file
+    env_file=$(mktemp -p "$TEST_TEMP_DIR")
+    cat > "$env_file" << 'EOF'
+API_KEY="single line value"
+DATABASE="another single line"
+EOF
+
+    run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file'"
+    assert_success
+    assert_line --index 0 "API_KEY=single line value"
+    assert_line --index 1 "DATABASE=another single line"
+}
+
+@test "parse_env_file handles unquoted values (backward compatibility)" {
+    local env_file
+    env_file=$(mktemp -p "$TEST_TEMP_DIR")
+    cat > "$env_file" << 'EOF'
+API_KEY=simple_value
+DATABASE_URL=postgresql://localhost/db
+NUMBER=12345
+EOF
+
+    run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file'"
+    assert_success
+    assert_line --index 0 "API_KEY=simple_value"
+    assert_line --index 1 "DATABASE_URL=postgresql://localhost/db"
+    assert_line --index 2 "NUMBER=12345"
 }
 
 @test "parse_env_file processes file from stdin when needed" {

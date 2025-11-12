@@ -169,7 +169,17 @@ inject_to_env_file() {
                 log_info "[DRY RUN] Would inject: $key"
                 echo "${key}=<secret-from-1password>" >> "$temp_file"
             else
-                echo "${key}=${value}" >> "$temp_file"
+                # Convert \n escape sequences back to actual newlines for multiline values
+                # Use printf to interpret escape sequences
+                local processed_value
+                processed_value=$(printf '%b' "$value")
+
+                # If value contains newlines, wrap in double quotes
+                if [[ "$processed_value" == *$'\n'* ]]; then
+                    echo "${key}=\"${processed_value}\"" >> "$temp_file"
+                else
+                    echo "${key}=${processed_value}" >> "$temp_file"
+                fi
                 log_success "Retrieved: $key"
             fi
             ((count++))
