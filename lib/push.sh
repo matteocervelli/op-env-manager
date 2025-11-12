@@ -14,6 +14,8 @@ VAULT=""
 ITEM_NAME=""
 SECTION=""
 DRY_RUN=false
+SAVE_TEMPLATE=false
+TEMPLATE_OUTPUT=".env.op"
 
 # Show usage
 usage() {
@@ -23,17 +25,20 @@ Usage: op-env-manager push [options]
 Push local .env file variables to 1Password vault as individual password items.
 
 Options:
-    --env-file=FILE     Path to .env file (default: .env)
-    --vault=VAULT       1Password vault name (required)
-    --item=NAME         Item name prefix (default: env-secrets)
-    --section=SECTION   Environment section (e.g., dev, prod, staging, demo)
-    --dry-run           Preview what would be pushed without actually pushing
+    --env-file=FILE        Path to .env file (default: .env)
+    --vault=VAULT          1Password vault name (required)
+    --item=NAME            Item name prefix (default: env-secrets)
+    --section=SECTION      Environment section (e.g., dev, prod, staging, demo)
+    --template             Also generate .env.op template file with op:// references
+    --template-output=FILE Output path for template file (default: .env.op)
+    --dry-run              Preview what would be pushed without actually pushing
 
 Examples:
     op-env-manager push --vault="Personal" --env-file=.env.production
     op-env-manager push --vault="Projects" --item="myapp" --section="dev" --env-file=.env.dev
     op-env-manager push --vault="Projects" --item="myapp" --section="prod" --env-file=.env.prod
     op-env-manager push --vault="Work" --item="myapp" --dry-run
+    op-env-manager push --vault="Personal" --template  # Also generate .env.op
 
 Notes:
     - Creates a single Secure Note item in 1Password with all variables as fields
@@ -221,8 +226,33 @@ push_to_1password() {
     echo ""
     if [ "$DRY_RUN" = true ]; then
         log_warning "DRY RUN: No changes made. Remove --dry-run to push for real."
+        if [ "$SAVE_TEMPLATE" = true ]; then
+            log_info "Would also generate template file: $TEMPLATE_OUTPUT"
+        fi
     else
         log_success "Successfully pushed environment variables to 1Password!"
+
+        # Generate template file if requested
+        if [ "$SAVE_TEMPLATE" = true ]; then
+            echo ""
+            log_step "Generating template file: $TEMPLATE_OUTPUT"
+
+            # Source template generation functions
+            source "$LIB_DIR/template.sh"
+
+            # Collect field names from what we just pushed
+            local field_names=()
+            while IFS='=' read -r key value; do
+                if [ -n "$key" ]; then
+                    field_names+=("$key")
+                fi
+            done <<< "$vars"
+
+            # Generate template file
+            generate_template_file "$VAULT" "$ITEM_NAME" "$SECTION" "$TEMPLATE_OUTPUT" "${field_names[@]}"
+            log_success "Template file saved: $TEMPLATE_OUTPUT"
+        fi
+
         echo ""
         log_info "To inject these back into your environment:"
         if [ -n "$SECTION" ]; then
@@ -233,6 +263,15 @@ push_to_1password() {
             echo "  op run --env-file=<(op-env-manager inject --vault=\"$VAULT\" --item=\"$ITEM_NAME\" --section=\"\$APP_ENV\") -- your-command"
         else
             echo "  op-env-manager inject --vault=\"$VAULT\" --item=\"$ITEM_NAME\""
+        fi
+
+        if [ "$SAVE_TEMPLATE" = true ]; then
+            echo ""
+            log_info "Or use template file with op run:"
+            if [ -n "$SECTION" ]; then
+                echo "  export APP_ENV=\"$SECTION\""
+            fi
+            echo "  op run --env-file=$TEMPLATE_OUTPUT -- your-command"
         fi
     fi
 }
@@ -271,6 +310,20 @@ parse_args() {
                 ;;
             --section)
                 SECTION="$2"
+                shift 2
+                ;;
+            --template)
+                SAVE_TEMPLATE=true
+                shift
+                ;;
+            --template-output=*)
+                SAVE_TEMPLATE=true
+                TEMPLATE_OUTPUT="${1#*=}"
+                shift
+                ;;
+            --template-output)
+                SAVE_TEMPLATE=true
+                TEMPLATE_OUTPUT="$2"
                 shift 2
                 ;;
             --dry-run)

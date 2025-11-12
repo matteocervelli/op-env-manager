@@ -14,6 +14,8 @@ VAULT=""
 ITEM_NAME=""
 SECTION=""
 DRY_RUN=false
+SAVE_TEMPLATE=false
+TEMPLATE_OUTPUT=".env.op"
 
 # Show usage
 usage() {
@@ -26,11 +28,13 @@ resolves those references to actual values, and pushes them to a new 1Password
 item using op-env-manager's naming convention.
 
 Options:
-    --env-file=FILE     Path to .env file with op:// references (required)
-    --vault=VAULT       Target 1Password vault name (required)
-    --item=NAME         Target item name prefix (default: env-secrets)
-    --section=SECTION   Environment section (e.g., dev, prod, staging)
-    --dry-run           Preview what would be converted without actually pushing
+    --env-file=FILE        Path to .env file with op:// references (required)
+    --vault=VAULT          Target 1Password vault name (required)
+    --item=NAME            Target item name prefix (default: env-secrets)
+    --section=SECTION      Environment section (e.g., dev, prod, staging)
+    --template             Also generate .env.op template file with op:// references
+    --template-output=FILE Output path for template file (default: .env.op)
+    --dry-run              Preview what would be converted without actually pushing
 
 Examples:
     # Convert legacy .env.template to op-env-manager format
@@ -51,6 +55,12 @@ Examples:
       --env-file=.env.template \\
       --vault="Personal" \\
       --dry-run
+
+    # Convert and generate template file
+    op-env-manager convert \\
+      --env-file=.env.legacy \\
+      --vault="Personal" \\
+      --template
 
 Notes:
     - Resolves op:// references using 'op read' command
@@ -384,14 +394,55 @@ convert_to_1password() {
     if [ "$DRY_RUN" = true ]; then
         log_warning "DRY RUN: No changes made. Remove --dry-run to convert for real."
         log_info "Would convert $count variables ($op_ref_count with op:// references)"
+        if [ "$SAVE_TEMPLATE" = true ]; then
+            log_info "Would also generate template file: $TEMPLATE_OUTPUT"
+        fi
     else
         log_success "Successfully converted and pushed environment variables!"
+
+        # Generate template file if requested
+        if [ "$SAVE_TEMPLATE" = true ]; then
+            echo ""
+            log_step "Generating template file: $TEMPLATE_OUTPUT"
+
+            # Source template generation functions
+            source "$LIB_DIR/template.sh"
+
+            # Collect field names from converted variables
+            local field_names=()
+            while IFS= read -r line; do
+                # Skip empty lines
+                [ -z "$line" ] && continue
+
+                # Parse KEY=VALUE
+                if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                    local key="${BASH_REMATCH[1]}"
+                    if [ -n "$key" ]; then
+                        field_names+=("$key")
+                    fi
+                fi
+            done <<< "$resolved_vars"
+
+            # Generate template file
+            generate_template_file "$VAULT" "$ITEM_NAME" "$SECTION" "$TEMPLATE_OUTPUT" "${field_names[@]}"
+            log_success "Template file saved: $TEMPLATE_OUTPUT"
+        fi
+
         echo ""
         log_info "To inject these back into your environment:"
         if [ -n "$SECTION" ]; then
             echo "  op-env-manager inject --vault=\"$VAULT\" --item=\"$ITEM_NAME\" --section=\"$SECTION\""
         else
             echo "  op-env-manager inject --vault=\"$VAULT\" --item=\"$ITEM_NAME\""
+        fi
+
+        if [ "$SAVE_TEMPLATE" = true ]; then
+            echo ""
+            log_info "Or use template file with op run:"
+            if [ -n "$SECTION" ]; then
+                echo "  export APP_ENV=\"$SECTION\""
+            fi
+            echo "  op run --env-file=$TEMPLATE_OUTPUT -- your-command"
         fi
     fi
 }
@@ -430,6 +481,20 @@ parse_args() {
                 ;;
             --section)
                 SECTION="$2"
+                shift 2
+                ;;
+            --template)
+                SAVE_TEMPLATE=true
+                shift
+                ;;
+            --template-output=*)
+                SAVE_TEMPLATE=true
+                TEMPLATE_OUTPUT="${1#*=}"
+                shift
+                ;;
+            --template-output)
+                SAVE_TEMPLATE=true
+                TEMPLATE_OUTPUT="$2"
                 shift 2
                 ;;
             --dry-run)

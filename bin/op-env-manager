@@ -36,6 +36,7 @@ COMMANDS:
     inject      Inject secrets from 1Password to local .env file
     run         Run command with secrets injected from 1Password
     convert     Convert .env files with op:// references to op-env-manager format
+    template    Generate .env.op template file with op:// references
     init        Initialize 1Password vault structure (coming soon)
     version     Show version information
     help        Show this help message
@@ -58,6 +59,9 @@ EXAMPLES:
 
     # Convert legacy .env with op:// references
     op-env-manager convert --vault="Personal" --item="myapp" --env-file=.env.template
+
+    # Generate template file from existing 1Password item
+    op-env-manager template --vault="Personal" --item="myapp"
 
     # Show help for specific command
     op-env-manager push --help
@@ -94,6 +98,8 @@ run_with_secrets() {
     local section=""
     local env_file=""
     local dry_run=false
+    local save_template=false
+    local template_output=".env.op"
 
     # Parse arguments until we hit --
     while [[ $# -gt 0 ]]; do
@@ -130,6 +136,20 @@ run_with_secrets() {
                 env_file="$2"
                 shift 2
                 ;;
+            --template)
+                save_template=true
+                shift
+                ;;
+            --template-output=*)
+                save_template=true
+                template_output="${1#*=}"
+                shift
+                ;;
+            --template-output)
+                save_template=true
+                template_output="$2"
+                shift 2
+                ;;
             --dry-run)
                 dry_run=true
                 shift
@@ -141,7 +161,7 @@ run_with_secrets() {
             *)
                 log_error "Unknown option for run command: $1"
                 echo ""
-                echo "Usage: op-env-manager run --vault=VAULT [--item=ITEM] [--section=SECTION] [--env-file=FILE] [--dry-run] -- <command>"
+                echo "Usage: op-env-manager run --vault=VAULT [--item=ITEM] [--section=SECTION] [--env-file=FILE] [--template] [--template-output=FILE] [--dry-run] -- <command>"
                 exit 1
                 ;;
         esac
@@ -176,6 +196,9 @@ run_with_secrets() {
     log_info "Command: $*"
     echo ""
 
+    # Source template generation functions
+    source "$LIB_DIR/template.sh"
+
     # Create temporary .env file with secret references
     local temp_env
     temp_env=$(mktemp)
@@ -197,25 +220,41 @@ run_with_secrets() {
         exit 1
     fi
 
-    # Build secret references
+    # Collect field names in array
+    local field_names=()
     if [ -n "$section" ]; then
-        # Use $APP_ENV variable in references for dynamic section selection
-        echo "$item_json" | jq -r ".fields[] | select(.section.label == \"$section\") | .label" | while IFS= read -r field_name; do
-            echo "${field_name}=op://${vault}/${item}/\$APP_ENV/${field_name}" >> "$temp_env"
-        done
+        # Get fields from specific section
+        while IFS= read -r field_name; do
+            [ -n "$field_name" ] && field_names+=("$field_name")
+        done < <(echo "$item_json" | jq -r ".fields[] | select(.section.label == \"$section\") | .label")
+    else
+        # Get fields without section
+        while IFS= read -r field_name; do
+            [ -n "$field_name" ] && field_names+=("$field_name")
+        done < <(echo "$item_json" | jq -r '.fields[] | select(.section == null) | .label')
+    fi
 
+    # Build secret references using shared function
+    for field_name in "${field_names[@]}"; do
+        generate_op_reference "$vault" "$item" "$section" "$field_name" >> "$temp_env"
+    done
+
+    if [ -n "$section" ]; then
         # Set APP_ENV for this execution
         export APP_ENV="$section"
         log_info "Set APP_ENV=$section"
-    else
-        # No section - reference fields directly
-        echo "$item_json" | jq -r '.fields[] | select(.section == null) | .label' | while IFS= read -r field_name; do
-            echo "${field_name}=op://${vault}/${item}/${field_name}" >> "$temp_env"
-        done
     fi
 
     log_success "Secret references created"
     echo ""
+
+    # Save template file if requested
+    if [ "$save_template" = true ]; then
+        log_step "Saving template file: $template_output"
+        generate_template_file "$vault" "$item" "$section" "$template_output" "${field_names[@]}"
+        log_success "Template file saved: $template_output"
+        echo ""
+    fi
 
     if [ "$dry_run" = true ]; then
         log_warning "DRY RUN: Preview of secret references that would be used:"
@@ -224,6 +263,9 @@ run_with_secrets() {
         echo ""
         if [ -n "$env_file" ]; then
             log_info "Would also load additional env file: $env_file"
+        fi
+        if [ "$save_template" = true ]; then
+            log_info "Would save template file: $template_output"
         fi
         log_info "Would execute command: $*"
         echo ""
@@ -275,6 +317,10 @@ main() {
             ;;
         convert)
             source "$LIB_DIR/convert.sh"
+            main "$@"
+            ;;
+        template)
+            source "$LIB_DIR/template.sh"
             main "$@"
             ;;
         init)

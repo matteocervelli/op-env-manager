@@ -6,6 +6,7 @@ by [Matteo Cervelli](https://github.com/matteocervelli)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![1Password CLI](https://img.shields.io/badge/1Password-CLI-blue.svg)](https://developer.1password.com/docs/cli/)
+[![Buy Me A Coffee](https://img.shields.io/badge/☕-Buy%20me%20a%20coffee-orange.svg)](https://adli.men/coffee)
 
 ---
 
@@ -17,8 +18,32 @@ by [Matteo Cervelli](https://github.com/matteocervelli)
 - **Inject**: Download secrets from 1Password into local `.env` files
 - **Run**: Execute commands with secrets injected from 1Password (no plaintext files!)
 - **Convert**: Migrate legacy `.env` files with `op://` references to op-env-manager format
+- **Template**: Generate `.env.op` files with `op://` references for version control
 
 Stop committing secrets to git. Stop sharing `.env` files over Slack. Use 1Password.
+
+## Architecture
+
+```mermaid
+graph LR
+    A[.env Files] -->|push| B[op-env-manager]
+    B -->|Secure Storage| C[1Password Vaults]
+    C -->|inject| B
+    B -->|.env Files| A
+    B -->|run| D[App with Secrets]
+    C -.->|runtime injection| D
+    E[.env.op Templates] -.->|safe for git| F[Version Control]
+
+    style C fill:#0094F5,color:#fff
+    style B fill:#333,color:#fff
+    style F fill:#2ea44f,color:#fff
+```
+
+**How it works**:
+1. **Push**: Parse local `.env` → Create/update 1Password Secure Note with fields
+2. **Inject**: Fetch 1Password fields → Write to local `.env` (chmod 600)
+3. **Run**: Generate `op://` references → Execute with `op run` (no plaintext on disk)
+4. **Template**: Create `.env.op` with references → Safe for git commits
 
 ## Why?
 
@@ -40,9 +65,39 @@ Stop committing secrets to git. Stop sharing `.env` files over Slack. Use 1Passw
 ✅ **Multiple Vaults** - Separate dev, staging, production secrets
 ✅ **Dry Run Mode** - Preview changes before applying
 ✅ **Runtime Injection** - Run commands with secrets (no disk storage)
+✅ **Template Generation** - Create safe `.env.op` files for version control
 ✅ **Team Friendly** - Share vaults, control access
 ✅ **Git Safe** - Never commit secrets again
 ✅ **Auto-tagging** - All items tagged for easy filtering
+
+## Comparison with Alternatives
+
+| Feature | op-env-manager | dotenv | envkey | AWS Secrets | HashiCorp Vault |
+|---------|---------------|--------|--------|-------------|-----------------|
+| **Cost** | Free (uses 1Password) | Free | Paid plans | AWS pricing | Self-hosted/paid |
+| **Setup Complexity** | Low (1Password CLI) | Very low | Medium | High | Very high |
+| **Team Sharing** | ✅ (1Password vaults) | ❌ (manual files) | ✅ | ✅ | ✅ |
+| **Access Control** | ✅ (1Password policies) | ❌ | ✅ | ✅ | ✅ |
+| **Audit Trail** | ✅ (1Password logs) | ❌ | ✅ | ✅ | ✅ |
+| **Runtime Injection** | ✅ (`run` command) | ❌ | ✅ | ❌ | ✅ |
+| **Multi-Environment** | ✅ (sections/vaults) | Manual files | ✅ | ✅ | ✅ |
+| **Git Safe** | ✅ (templates) | ⚠️ (gitignore) | ✅ | ✅ | ✅ |
+| **CI/CD Integration** | ✅ (Service Accounts) | ✅ | ✅ | ✅ | ✅ |
+| **Learning Curve** | Low | Very low | Medium | Medium | High |
+| **Infrastructure** | None (SaaS) | None | SaaS | AWS account | Self-hosted |
+
+**When to use op-env-manager**:
+- ✅ You already use 1Password for your team
+- ✅ You want simple, secure secret management without new infrastructure
+- ✅ You need team collaboration with access control
+- ✅ You want audit trails and versioning
+- ✅ You prefer CLI tools over web dashboards
+
+**When to use alternatives**:
+- **dotenv**: Solo projects, no team collaboration needed, very simple setup
+- **envkey**: Need dedicated secret management platform, willing to pay
+- **AWS Secrets Manager**: Already on AWS, want tight AWS integration
+- **HashiCorp Vault**: Enterprise needs, complex access patterns, dynamic secrets
 
 ## Installation
 
@@ -151,15 +206,18 @@ op-env-manager <command> [options]
 op-env-manager push --vault VAULT [options]
 
 Options:
-  --env FILE          .env file to push (default: .env)
-  --vault VAULT       1Password vault name (required)
-  --item NAME         Item name prefix (default: env-secrets)
-  --dry-run           Preview without pushing
+  --env FILE             .env file to push (default: .env)
+  --vault VAULT          1Password vault name (required)
+  --item NAME            Item name prefix (default: env-secrets)
+  --template             Also generate .env.op template file
+  --template-output FILE Output path for template (default: .env.op)
+  --dry-run              Preview without pushing
 
 Examples:
   op-env-manager push --vault "Personal"
   op-env-manager push --vault "Production" --env .env.prod --item "api"
   op-env-manager push --vault "Dev" --dry-run
+  op-env-manager push --vault "Personal" --template  # Also generate .env.op
 ```
 
 #### `inject` - Download secrets from 1Password
@@ -186,14 +244,17 @@ Examples:
 op-env-manager run --vault VAULT [options] -- <command>
 
 Options:
-  --vault VAULT       1Password vault name (required)
-  --item NAME         Item name prefix (default: env-secrets)
-  --env-file FILE     Additional .env file to merge
+  --vault VAULT          1Password vault name (required)
+  --item NAME            Item name prefix (default: env-secrets)
+  --env-file FILE        Additional .env file to merge
+  --template             Also save .env.op template file
+  --template-output FILE Output path for template (default: .env.op)
 
 Examples:
   op-env-manager run --vault "Production" -- docker compose up
   op-env-manager run --vault "Dev" --item "api" -- npm start
   op-env-manager run --vault "Staging" -- python manage.py migrate
+  op-env-manager run --vault "Personal" --template -- npm start  # Also save .env.op
 ```
 
 #### `convert` - Migrate from op:// reference format
@@ -202,11 +263,13 @@ Examples:
 op-env-manager convert --vault VAULT --env FILE [options]
 
 Options:
-  --env FILE          .env file with op:// references (required)
-  --vault VAULT       Target 1Password vault name (required)
-  --item NAME         Target item name prefix (default: env-secrets)
-  --section SECTION   Environment section (e.g., dev, prod)
-  --dry-run           Preview without converting
+  --env FILE             .env file with op:// references (required)
+  --vault VAULT          Target 1Password vault name (required)
+  --item NAME            Target item name prefix (default: env-secrets)
+  --section SECTION      Environment section (e.g., dev, prod)
+  --template             Also generate .env.op template file
+  --template-output FILE Output path for template (default: .env.op)
+  --dry-run              Preview without converting
 
 Examples:
   # Convert legacy .env.template with op:// references
@@ -218,6 +281,9 @@ Examples:
   # Preview conversion
   op-env-manager convert --vault "Personal" --env .env.template --dry-run
 
+  # Convert and generate template
+  op-env-manager convert --vault "Personal" --env .env.legacy --template
+
 What it does:
   1. Parses .env file with op://vault/item/field references
   2. Resolves each reference using 'op read'
@@ -225,6 +291,57 @@ What it does:
   4. No temporary plaintext files created
 
 See: docs/1password-formats.md for detailed format comparison
+```
+
+#### `template` - Generate op:// reference files
+
+Generate `.env.op` template files with `op://` secret references that can be safely committed to version control.
+
+```bash
+op-env-manager template --vault VAULT [options]
+
+Options:
+  --vault VAULT          1Password vault name (required)
+  --item NAME            Item name (default: env-secrets)
+  --section SECTION      Environment section (e.g., dev, prod)
+  --output FILE          Output file (default: .env.op)
+  --dry-run              Preview without generating
+
+Examples:
+  # Generate template from existing 1Password item
+  op-env-manager template --vault "Personal" --item "myapp"
+
+  # Generate with section (uses $APP_ENV variable)
+  op-env-manager template --vault "Projects" --item "myapp" --section "dev"
+
+  # Custom output filename
+  op-env-manager template --vault "Personal" --output ".env.template"
+
+Generated Format:
+  # Without section:
+  API_KEY=op://Personal/myapp/API_KEY
+  DATABASE_URL=op://Personal/myapp/DATABASE_URL
+
+  # With section (dynamic):
+  API_KEY=op://Personal/myapp/$APP_ENV/API_KEY
+  DATABASE_URL=op://Personal/myapp/$APP_ENV/DATABASE_URL
+
+Usage with op run:
+  # Set APP_ENV to select section dynamically
+  export APP_ENV="dev"
+  op run --env-file=.env.op -- docker compose up
+
+Using --template flag:
+  All commands support --template flag to automatically generate .env.op:
+
+  # Push and generate template
+  op-env-manager push --vault "Personal" --template
+
+  # Convert and generate template
+  op-env-manager convert --vault "Personal" --env .env.legacy --template
+
+  # Run and save template
+  op-env-manager run --vault "Personal" --template -- docker compose up
 ```
 
 ## Workflows
@@ -456,6 +573,18 @@ Transformation & Business Scalability Engineer
 - **Issues**: [GitHub Issues](https://github.com/matteocervelli/op-env-manager/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/matteocervelli/op-env-manager/discussions)
 - **1Password CLI**: [1Password Support](https://support.1password.com/)
+
+### Support This Project
+
+If `op-env-manager` saves you time and improves your team's security, consider supporting its development:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/☕-Buy%20me%20a%20coffee-orange.svg?style=for-the-badge)](https://adli.men/coffee)
+
+Your support helps me:
+- Maintain and improve this tool
+- Create more open-source developer tools
+- Write documentation and tutorials
+- Provide community support
 
 ---
 

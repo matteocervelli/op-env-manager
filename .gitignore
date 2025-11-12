@@ -218,6 +218,9 @@ archive/
 old/
 deprecated/
 
+# Content drafts and marketing materials (local only)
+content/
+
 # Local development overrides
 local/
 *.local.sh
