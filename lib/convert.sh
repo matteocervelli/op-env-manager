@@ -101,7 +101,7 @@ check_op_cli() {
 # Detect if a value contains op:// reference
 has_op_reference() {
     local value="$1"
-    if [[ "$value" =~ op://[^[:space:]]+ ]]; then
+    if [[ "$value" =~ op:// ]]; then
         return 0
     else
         return 1
@@ -109,11 +109,39 @@ has_op_reference() {
 }
 
 # Extract op:// reference from value
+# Handles item names with spaces by matching until @ or end of line
 extract_op_reference() {
     local value="$1"
-    # Extract the op:// reference (handles embedded references in strings)
+
+    # op:// reference format: op://vault/item-name/field
+    # Item names can contain spaces, so we need smart detection
+
+    # Strategy: Look for the pattern and find where it ends
+    # It ends at: @ (in URLs), end of string, or start of another protocol
+
+    # Case 1: Reference embedded in URL before @ (most common)
+    # Example: postgresql://user:op://vault/item name/field@host
+    # Match everything from op:// until @
+    if [[ "$value" =~ op://([^@]+)@ ]]; then
+        # Extract the full reference including the op:// prefix
+        local full_match="${BASH_REMATCH[0]}"
+        # Remove the trailing @
+        echo "${full_match%@}"
+        return 0
+    fi
+
+    # Case 2: Reference is the entire value or standalone
+    # Example: API_KEY=op://vault/item name/field
+    # Match from op:// to end of string (allowing spaces)
+    if [[ "$value" =~ op://(.+)$ ]]; then
+        echo "op://${BASH_REMATCH[1]}"
+        return 0
+    fi
+
+    # Case 3: Fallback - shouldn't reach here
     if [[ "$value" =~ (op://[^[:space:]]+) ]]; then
         echo "${BASH_REMATCH[1]}"
+        return 0
     fi
 }
 
@@ -127,10 +155,15 @@ resolve_op_reference() {
         return 0
     fi
 
+    # Show progress (helps debug slow operations)
+    log_info "Resolving: $ref" >&2
+
     # Use op read to resolve the reference
     value=$(op read "$ref" 2>&1)
-    if [ $? -ne 0 ]; then
-        log_error "Failed to resolve reference: $ref"
+    local exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        log_error "Failed to resolve reference: $ref" >&2
         echo "$value" >&2
         return 1
     fi
@@ -239,17 +272,27 @@ convert_to_1password() {
             log_info "[DRY RUN] Section: $SECTION"
         fi
         echo ""
-        while IFS='=' read -r key value; do
-            if [ -n "$key" ]; then
-                if [ -n "$SECTION" ]; then
-                    log_info "[DRY RUN] Would set: $SECTION.$key = ${value:0:20}..."
-                else
-                    log_info "[DRY RUN] Would set: $key = ${value:0:20}..."
+
+        while IFS= read -r line || [ -n "$line" ]; do
+            # Skip empty lines
+            [ -z "$line" ] && continue
+
+            # Parse KEY=VALUE
+            if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                local key="${BASH_REMATCH[1]}"
+                local value="${BASH_REMATCH[2]}"
+
+                if [ -n "$key" ]; then
+                    if [ -n "$SECTION" ]; then
+                        log_info "[DRY RUN] Would set: $SECTION.$key = ${value:0:20}..."
+                    else
+                        log_info "[DRY RUN] Would set: $key = ${value:0:20}..."
+                    fi
+                    if [[ "$value" == *"[RESOLVED:"* ]]; then
+                        op_ref_count=$((op_ref_count + 1))
+                    fi
+                    count=$((count + 1))
                 fi
-                if [[ "$value" == *"[RESOLVED:"* ]]; then
-                    ((op_ref_count++))
-                fi
-                ((count++))
             fi
         done <<< "$resolved_vars"
     else
@@ -268,16 +311,25 @@ convert_to_1password() {
         temp_fields=$(mktemp)
         trap 'rm -f "$temp_fields"' EXIT
 
-        while IFS='=' read -r key value; do
-            if [ -n "$key" ]; then
-                if [ -n "$SECTION" ]; then
-                    echo "${SECTION}.${key}[password]=${value}" >> "$temp_fields"
-                    log_success "Converted: $SECTION.$key"
-                else
-                    echo "${key}[password]=${value}" >> "$temp_fields"
-                    log_success "Converted: $key"
+        while IFS= read -r line; do
+            # Skip empty lines
+            [ -z "$line" ] && continue
+
+            # Parse KEY=VALUE
+            if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                local key="${BASH_REMATCH[1]}"
+                local value="${BASH_REMATCH[2]}"
+
+                if [ -n "$key" ]; then
+                    if [ -n "$SECTION" ]; then
+                        echo "${SECTION}.${key}[password]=${value}" >> "$temp_fields"
+                        log_success "Converted: $SECTION.$key"
+                    else
+                        echo "${key}[password]=${value}" >> "$temp_fields"
+                        log_success "Converted: $key"
+                    fi
+                    count=$((count + 1))
                 fi
-                ((count++))
             fi
         done <<< "$resolved_vars"
 
