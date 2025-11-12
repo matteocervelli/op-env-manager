@@ -1,0 +1,12 @@
+{
+  "files.exclude": {
+    "tests/test_helper/bats-assert": true,
+    "tests/test_helper/bats-file": true,
+    "tests/test_helper/bats-support": true
+  },
+  "search.exclude": {
+    "tests/test_helper/bats-assert": true,
+    "tests/test_helper/bats-file": true,
+    "tests/test_helper/bats-support": true
+  }
+}
