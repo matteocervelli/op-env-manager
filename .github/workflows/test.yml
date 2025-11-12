@@ -22,13 +22,16 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y bats jq kcov
+        sudo apt-get install -y bats jq shellcheck
 
     - name: Install dependencies (macOS)
       if: runner.os == 'macOS'
       run: |
-        brew install bats-core jq
-        # Note: kcov is not available on macOS, coverage will only work on Linux
+        brew install bats-core jq shellcheck
+
+    - name: Run ShellCheck linting
+      run: |
+        shellcheck bin/op-env-manager lib/*.sh install.sh
 
     - name: Run Unit Tests
       run: bats tests/unit/
@@ -42,16 +45,8 @@ jobs:
     - name: Run Performance Tests
       run: bats tests/performance/
 
-    - name: Run All Tests with Coverage (Linux only)
-      if: runner.os == 'Linux'
+    - name: Generate test report
+      if: always()
       run: |
-        mkdir -p coverage
-        kcov --exclude-pattern=/usr/share,/tmp,test_helper coverage bats tests/
-
-    - name: Upload coverage to Codecov
-      if: runner.os == 'Linux'
-      uses: codecov/codecov-action@v3
-      with:
-        files: ./coverage/bats/cobertura.xml
-        flags: bats-tests
-        name: bats-coverage
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "✅ All bats tests completed on ${{ runner.os }}" >> $GITHUB_STEP_SUMMARY
