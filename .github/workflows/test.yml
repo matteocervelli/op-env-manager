@@ -1,0 +1,36 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bats jq
+
+    - name: Run Unit Tests
+      run: bats tests/unit/
+
+    - name: Run Integration Tests  
+      run: bats tests/integration/
+
+    - name: Run Security Tests
+      run: bats tests/security/
+
+    - name: Run Performance Tests
+      run: bats tests/performance/
+
+    - name: Run All Tests
+      run: bats tests/
