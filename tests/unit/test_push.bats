@@ -413,8 +413,9 @@ EOF
 
 @test "parse_env_file works with create_test_env_large fixture" {
     local env_file
-    env_file=$(create_test_env_large 50)
-    
+    env_file=$(mktemp -p "$TEST_TEMP_DIR")
+    create_test_env_large "$env_file" 50
+
     run bash -c "source '$LIB_DIR/push.sh' && parse_env_file '$env_file' | wc -l"
     assert_success
     [ "$output" -eq 50 ]
