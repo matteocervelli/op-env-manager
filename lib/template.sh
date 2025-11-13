@@ -7,6 +7,7 @@ set -eo pipefail
 # Get script directory
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/logger.sh"
+source "$LIB_DIR/error_helpers.sh"
 
 # Global variables for standalone command
 VAULT=""
@@ -80,10 +81,25 @@ get_field_names_from_item() {
 
     # Get item JSON
     local item_json
-    item_json=$(op item get "$item" --vault "$vault" --format json 2>/dev/null)
+    local error_output
+    error_output=$(mktemp)
+    trap 'rm -f "$error_output"' EXIT
+
+    item_json=$(op item get "$item" --vault "$vault" --format json 2>"$error_output")
 
     if [ -z "$item_json" ]; then
-        log_error "Item not found: $item in vault: $vault"
+        local error_msg
+        error_msg=$(cat "$error_output")
+
+        log_error "Item not found: $item in vault $vault"
+
+        # Check for specific errors
+        if echo "$error_msg" | grep -qi "vault.*not found"; then
+            suggest_vault_list "$vault"
+        else
+            suggest_item_push "$vault" "$item"
+            suggest_item_list "$vault" "$item"
+        fi
         return 1
     fi
 
@@ -112,21 +128,17 @@ template_command() {
 
     if [ -z "$VAULT" ]; then
         log_error "--vault is required"
+        echo "" >&2
+        log_suggestion "Specify a vault name:"
+        log_command "op-env-manager template --vault=\"VaultName\" --item=\"item-name\""
+        echo "" >&2
+        suggest_vault_list
         usage
     fi
 
-    # Check if 1Password CLI is installed
-    if ! command -v op &> /dev/null; then
-        log_error "1Password CLI (op) is not installed"
-        log_info "See installation guide: docs/1PASSWORD_SETUP.md"
-        exit 1
-    fi
-
     if [ "$DRY_RUN" = false ]; then
-        # Check authentication
-        if ! op account list &> /dev/null; then
-            log_error "Not signed in to 1Password CLI"
-            log_info "Sign in with: op signin"
+        # Use centralized diagnostics from error_helpers
+        if ! diagnose_op_cli; then
             exit 1
         fi
     fi
@@ -151,9 +163,17 @@ template_command() {
     field_names=$(get_field_names_from_item "$VAULT" "$ITEM_NAME" "$SECTION")
 
     if [ -z "$field_names" ]; then
-        log_error "No fields found in item"
         if [ -n "$SECTION" ]; then
-            log_info "Check that section '$SECTION' exists in item '$ITEM_NAME'"
+            log_error "No fields found in section: $SECTION"
+            suggest_section_check "$VAULT" "$ITEM_NAME" "$SECTION"
+
+            echo "" >&2
+            log_suggestion "Or push your environment to this section:"
+            log_command "op-env-manager push --vault=\"$VAULT\" --item=\"$ITEM_NAME\" --section=\"$SECTION\" --env-file=\".env\""
+        else
+            log_error "No fields found in item: $ITEM_NAME"
+            echo "" >&2
+            suggest_item_push "$VAULT" "$ITEM_NAME"
         fi
         exit 1
     fi
@@ -176,7 +196,7 @@ template_command() {
     echo ""
     log_info "Preview:"
     head -n 15 "$OUTPUT_FILE"
-    if [ $field_count -gt 10 ]; then
+    if [ "$field_count" -gt 10 ]; then
         echo "... (showing first 10 fields)"
     fi
     echo ""

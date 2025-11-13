@@ -7,6 +7,7 @@ set -eo pipefail
 # Get script directory
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/logger.sh"
+source "$LIB_DIR/error_helpers.sh"
 
 # Global variables
 OUTPUT_FILE=".env"
@@ -50,20 +51,13 @@ EOF
 
 # Check if 1Password CLI is installed and authenticated
 check_op_cli() {
-    if ! command -v op &> /dev/null; then
-        log_error "1Password CLI (op) is not installed"
-        log_info "See installation guide: docs/1PASSWORD_SETUP.md"
-        exit 1
-    fi
-
     if [ "$DRY_RUN" = true ]; then
         log_info "Dry-run mode: skipping 1Password authentication check"
         return 0
     fi
 
-    if ! op account list &> /dev/null; then
-        log_error "Not signed in to 1Password CLI"
-        log_info "Sign in with: op signin"
+    # Use centralized diagnostics from error_helpers
+    if ! diagnose_op_cli; then
         exit 1
     fi
 
@@ -83,15 +77,24 @@ get_fields_from_item() {
 
     # Get the item
     local item_json
-    item_json=$(op item get "$item_name" --vault "$vault" --format json 2>/dev/null)
+    local error_output
+    error_output=$(mktemp)
+    trap 'rm -f "$error_output"' EXIT
+
+    item_json=$(op item get "$item_name" --vault "$vault" --format json 2>"$error_output")
 
     if [ -z "$item_json" ]; then
-        log_error "Item not found: $item_name"
-        log_info "Did you push your .env file first?"
-        if [ -n "$section" ]; then
-            echo "  op-env-manager push --vault=\"$vault\" --item=\"$item_name\" --section=\"$section\""
+        local error_msg
+        error_msg=$(cat "$error_output")
+
+        log_error "Item not found: $item_name in vault $vault"
+
+        # Check for specific errors
+        if echo "$error_msg" | grep -qi "vault.*not found"; then
+            suggest_vault_list "$vault"
         else
-            echo "  op-env-manager push --vault=\"$vault\" --item=\"$item_name\""
+            suggest_item_push "$vault" "$item_name"
+            suggest_item_list "$vault" "$item_name"
         fi
         exit 1
     fi
@@ -113,6 +116,11 @@ inject_to_env_file() {
 
     if [ -z "$VAULT" ]; then
         log_error "--vault is required"
+        echo "" >&2
+        log_suggestion "Specify a vault name:"
+        log_command "op-env-manager inject --vault=\"VaultName\" --item=\"item-name\""
+        echo "" >&2
+        suggest_vault_list
         usage
     fi
 
@@ -138,9 +146,17 @@ inject_to_env_file() {
     fields=$(get_fields_from_item "$VAULT" "$ITEM_NAME" "$SECTION")
 
     if [ -z "$fields" ]; then
-        log_error "No fields found in item"
         if [ -n "$SECTION" ]; then
-            log_info "Make sure the section '$SECTION' exists in the item"
+            log_error "No fields found in section: $SECTION"
+            suggest_section_check "$VAULT" "$ITEM_NAME" "$SECTION"
+
+            echo "" >&2
+            log_suggestion "Or push your environment to this section:"
+            log_command "op-env-manager push --vault=\"$VAULT\" --item=\"$ITEM_NAME\" --section=\"$SECTION\" --env-file=\".env\""
+        else
+            log_error "No fields found in item: $ITEM_NAME"
+            echo "" >&2
+            suggest_item_push "$VAULT" "$ITEM_NAME"
         fi
         exit 1
     fi
@@ -169,7 +185,17 @@ inject_to_env_file() {
                 log_info "[DRY RUN] Would inject: $key"
                 echo "${key}=<secret-from-1password>" >> "$temp_file"
             else
-                echo "${key}=${value}" >> "$temp_file"
+                # Convert \n escape sequences back to actual newlines for multiline values
+                # Use printf to interpret escape sequences
+                local processed_value
+                processed_value=$(printf '%b' "$value")
+
+                # If value contains newlines, wrap in double quotes
+                if [[ "$processed_value" == *$'\n'* ]]; then
+                    echo "${key}=\"${processed_value}\"" >> "$temp_file"
+                else
+                    echo "${key}=${processed_value}" >> "$temp_file"
+                fi
                 log_success "Retrieved: $key"
             fi
             ((count++))

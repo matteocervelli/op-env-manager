@@ -18,6 +18,7 @@ LIB_DIR="$PROJECT_ROOT/lib"
 
 # Source utilities
 source "$LIB_DIR/logger.sh"
+source "$LIB_DIR/error_helpers.sh"
 
 # Version
 VERSION="0.1.0"
@@ -169,20 +170,30 @@ run_with_secrets() {
 
     if [ -z "$vault" ]; then
         log_error "--vault is required for run command"
+        echo "" >&2
+        log_suggestion "Specify a vault name:"
+        log_command "op-env-manager run --vault=\"VaultName\" --item=\"item-name\" -- your-command"
+        echo "" >&2
+        suggest_vault_list
         exit 1
     fi
 
     if [ "$dry_run" = false ] && [ $# -eq 0 ]; then
         log_error "No command provided after --"
-        echo ""
-        echo "Usage: op-env-manager run --vault=VAULT [--item=ITEM] [--section=SECTION] [--env-file=FILE] -- <command>"
+        echo "" >&2
+        log_suggestion "Add command after -- separator:"
+        log_command "op-env-manager run --vault=\"$vault\" --item=\"$item\" -- your-command"
+        echo "" >&2
+        log_troubleshoot "Examples:"
+        echo "    op-env-manager run --vault=\"Personal\" --item=\"myapp\" -- npm start" >&2
+        echo "    op-env-manager run --vault=\"Personal\" --item=\"myapp\" -- docker compose up" >&2
+        echo "    op-env-manager run --vault=\"Personal\" --item=\"myapp\" --section=\"dev\" -- ./start.sh" >&2
+        echo "" >&2
         exit 1
     fi
 
-    # Check if 1Password CLI is installed
-    if ! command -v op &> /dev/null; then
-        log_error "1Password CLI (op) is not installed"
-        log_info "See installation guide: docs/1PASSWORD_SETUP.md"
+    # Check if 1Password CLI is installed and authenticated
+    if ! diagnose_op_cli; then
         exit 1
     fi
 
@@ -210,12 +221,16 @@ run_with_secrets() {
     item_json=$(op item get "$item" --vault "$vault" --format json 2>/dev/null)
 
     if [ -z "$item_json" ]; then
-        log_error "Item not found: $item"
-        log_info "Push your .env file first:"
+        log_error "Item not found: $item in vault $vault"
+
         if [ -n "$section" ]; then
-            echo "  op-env-manager push --vault=\"$vault\" --item=\"$item\" --section=\"$section\""
+            suggest_item_push "$vault" "$item" ".env"
+            echo "" >&2
+            log_info "Or check if item exists without section:"
+            suggest_item_list "$vault" "$item"
         else
-            echo "  op-env-manager push --vault=\"$vault\" --item=\"$item\""
+            suggest_item_push "$vault" "$item"
+            suggest_item_list "$vault" "$item"
         fi
         exit 1
     fi
@@ -334,7 +349,7 @@ main() {
             ;;
         *)
             log_error "Unknown command: $command"
-            echo ""
+            suggest_similar_command "$command"
             usage
             ;;
     esac

@@ -7,6 +7,7 @@ set -eo pipefail
 # Get script directory
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/logger.sh"
+source "$LIB_DIR/error_helpers.sh"
 
 # Global variables
 ENV_FILE=".env"
@@ -54,20 +55,13 @@ EOF
 
 # Check if 1Password CLI is installed and authenticated
 check_op_cli() {
-    if ! command -v op &> /dev/null; then
-        log_error "1Password CLI (op) is not installed"
-        log_info "See installation guide: docs/1PASSWORD_SETUP.md"
-        exit 1
-    fi
-
     if [ "$DRY_RUN" = true ]; then
         log_info "Dry-run mode: skipping 1Password authentication check"
         return 0
     fi
 
-    if ! op account list &> /dev/null; then
-        log_error "Not signed in to 1Password CLI"
-        log_info "Sign in with: op signin"
+    # Use centralized diagnostics from error_helpers
+    if ! diagnose_op_cli; then
         exit 1
     fi
 
@@ -75,30 +69,107 @@ check_op_cli() {
 }
 
 # Parse .env file and extract variables
+# Supports:
+# - Single-line values: KEY=value
+# - Quoted values: KEY="value with spaces"
+# - Multiline quoted values: KEY="line1
+#   line2"
+# - Comments (lines starting with #)
+# - Empty lines
+# Multiline values are converted to \n escape sequences for storage
 parse_env_file() {
     local env_file="$1"
 
     if [ ! -f "$env_file" ]; then
         log_error "Environment file not found: $env_file"
+        suggest_file_check "$env_file"
         exit 1
     fi
 
-    # Parse .env file, ignore comments and empty lines
-    grep -v '^\s*#' "$env_file" | grep -v '^\s*$' | while IFS='=' read -r key value; do
-        # Trim whitespace
-        key=$(echo "$key" | xargs)
-        value=$(echo "$value" | xargs)
+    # Use awk for robust multiline parsing (portable POSIX awk)
+    awk '
+    BEGIN {
+        in_value = 0
+        current_key = ""
+        current_value = ""
+    }
 
-        # Remove quotes from value if present
-        value="${value%\"}"
-        value="${value#\"}"
-        value="${value%\'}"
-        value="${value#\'}"
+    # Skip empty lines and comments when not in multiline value
+    !in_value && /^[[:space:]]*$/ { next }
+    !in_value && /^[[:space:]]*#/ { next }
 
-        if [ -n "$key" ]; then
-            echo "$key=$value"
-        fi
-    done
+    # Start of new key=value pair (allow leading whitespace)
+    !in_value && /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/ {
+        # Extract key and initial value using index and substr
+        eq_pos = index($0, "=")
+        current_key = substr($0, 1, eq_pos - 1)
+        current_value = substr($0, eq_pos + 1)
+
+        # Trim leading/trailing whitespace from key
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", current_key)
+
+        # Trim leading whitespace from value
+        gsub(/^[[:space:]]+/, "", current_value)
+
+        # Check if value starts with a double quote
+        if (substr(current_value, 1, 1) == "\"") {
+            # Remove opening quote
+            current_value = substr(current_value, 2)
+
+            # Check if value ends with closing quote (single-line quoted value)
+            if (match(current_value, /"[[:space:]]*$/)) {
+                # Remove trailing quote and whitespace
+                sub(/"[[:space:]]*$/, "", current_value)
+                print current_key "=" current_value
+                current_key = ""
+                current_value = ""
+            } else {
+                # Start of multiline quoted value
+                in_value = 1
+            }
+        } else {
+            # Unquoted value - trim trailing whitespace
+            gsub(/[[:space:]]+$/, "", current_value)
+            # Remove surrounding single quotes if present
+            if (substr(current_value, 1, 1) == "'"'"'" && substr(current_value, length(current_value), 1) == "'"'"'") {
+                current_value = substr(current_value, 2, length(current_value) - 2)
+            }
+            print current_key "=" current_value
+            current_key = ""
+            current_value = ""
+        }
+        next
+    }
+
+    # Continue reading multiline value
+    in_value {
+        # Check if this line contains closing quote
+        if (match($0, /"[[:space:]]*$/)) {
+            # Remove trailing quote and whitespace
+            line = $0
+            sub(/"[[:space:]]*$/, "", line)
+            # Append line with \n escape sequence
+            if (current_value != "") {
+                current_value = current_value "\\n" line
+            } else {
+                current_value = line
+            }
+            # Output the complete key=value pair
+            print current_key "=" current_value
+            in_value = 0
+            current_key = ""
+            current_value = ""
+        } else {
+            # Append line with \n escape sequence
+            if (current_value != "") {
+                current_value = current_value "\\n" $0
+            } else {
+                current_value = $0
+            }
+        }
+        next
+    }
+    ' "$env_file"
 }
 
 # Push variables to 1Password
@@ -108,6 +179,11 @@ push_to_1password() {
 
     if [ -z "$VAULT" ]; then
         log_error "--vault is required"
+        echo "" >&2
+        log_suggestion "Specify a vault name:"
+        log_command "op-env-manager push --vault=\"VaultName\" --env-file=\".env\""
+        echo "" >&2
+        suggest_vault_list
         usage
     fi
 
@@ -124,6 +200,18 @@ push_to_1password() {
 
     if [ -z "$vars" ]; then
         log_error "No variables found in $ENV_FILE"
+        echo "" >&2
+        log_suggestion "Check your .env file:"
+        log_command "cat \"$ENV_FILE\""
+        echo "" >&2
+        log_troubleshoot "Common issues:"
+        echo "    1. File is empty or contains only comments" >&2
+        echo "    2. Variables don't follow KEY=value format" >&2
+        echo "    3. File has incorrect encoding (use UTF-8)" >&2
+        echo "" >&2
+        log_info "Example .env format:"
+        log_command "API_KEY=your_key_here"
+        log_command "DATABASE_URL=\"postgresql://localhost/db\""
         exit 1
     fi
 
@@ -190,7 +278,22 @@ push_to_1password() {
             if [ $? -ne 0 ]; then
                 echo ""
                 log_error "Failed to update item in 1Password"
-                echo "$result"
+                echo ""
+                echo "$result" >&2
+                echo "" >&2
+
+                # Check for common errors
+                if echo "$result" | grep -qi "vault.*not found"; then
+                    suggest_vault_list "$VAULT"
+                elif echo "$result" | grep -qi "field.*too large\|size limit"; then
+                    suggest_field_limits
+                elif echo "$result" | grep -qi "network\|timeout\|connection"; then
+                    suggest_network_check
+                else
+                    log_troubleshoot "Verify vault access:"
+                    log_command "op vault get \"$VAULT\""
+                    echo "" >&2
+                fi
                 exit 1
             fi
         else
@@ -204,7 +307,25 @@ push_to_1password() {
             if [ $? -ne 0 ]; then
                 echo ""
                 log_error "Failed to create item in 1Password"
-                echo "$result"
+                echo ""
+                echo "$result" >&2
+                echo "" >&2
+
+                # Check for common errors
+                if echo "$result" | grep -qi "vault.*not found"; then
+                    suggest_vault_list "$VAULT"
+                elif echo "$result" | grep -qi "permission\|access denied"; then
+                    log_troubleshoot "Check vault permissions:"
+                    log_command "op vault get \"$VAULT\""
+                    echo "" >&2
+                    log_suggestion "You may need edit access to create items in this vault"
+                elif echo "$result" | grep -qi "network\|timeout\|connection"; then
+                    suggest_network_check
+                else
+                    log_info "Try verifying vault exists:"
+                    log_command "op vault list"
+                    echo "" >&2
+                fi
                 exit 1
             fi
 
@@ -216,7 +337,16 @@ push_to_1password() {
                 if [ $? -ne 0 ]; then
                     echo ""
                     log_error "Failed to add remaining fields to item"
-                    echo "$result"
+                    echo ""
+                    echo "$result" >&2
+                    echo "" >&2
+
+                    # Check for common errors
+                    if echo "$result" | grep -qi "field.*too large\|size limit"; then
+                        suggest_field_limits
+                    elif echo "$result" | grep -qi "network\|timeout\|connection"; then
+                        suggest_network_check
+                    fi
                     exit 1
                 fi
             fi

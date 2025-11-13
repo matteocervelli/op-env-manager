@@ -7,6 +7,7 @@ set -eo pipefail
 # Get script directory
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/logger.sh"
+source "$LIB_DIR/error_helpers.sh"
 
 # Global variables
 ENV_FILE=""
@@ -88,20 +89,13 @@ EOF
 
 # Check if 1Password CLI is installed and authenticated
 check_op_cli() {
-    if ! command -v op &> /dev/null; then
-        log_error "1Password CLI (op) is not installed"
-        log_info "See installation guide: docs/1PASSWORD_SETUP.md"
-        exit 1
-    fi
-
     if [ "$DRY_RUN" = true ]; then
         log_info "Dry-run mode: skipping 1Password authentication check"
         return 0
     fi
 
-    if ! op account list &> /dev/null; then
-        log_error "Not signed in to 1Password CLI"
-        log_info "Sign in with: op signin"
+    # Use centralized diagnostics from error_helpers
+    if ! diagnose_op_cli; then
         exit 1
     fi
 
@@ -174,7 +168,22 @@ resolve_op_reference() {
 
     if [ $exit_code -ne 0 ]; then
         log_error "Failed to resolve reference: $ref" >&2
+        echo "" >&2
         echo "$value" >&2
+
+        # Check for common errors
+        if echo "$value" | grep -qi "not found\|no item"; then
+            echo "" >&2
+            log_troubleshoot "The reference might be incorrect"
+            suggest_op_reference_format
+        elif echo "$value" | grep -qi "network\|timeout\|connection"; then
+            suggest_network_check
+        else
+            echo "" >&2
+            log_suggestion "Test the reference manually:"
+            log_command "op read \"$ref\""
+            echo "" >&2
+        fi
         return 1
     fi
 
@@ -187,6 +196,7 @@ parse_and_resolve_env_file() {
 
     if [ ! -f "$env_file" ]; then
         log_error "Environment file not found: $env_file"
+        suggest_file_check "$env_file"
         exit 1
     fi
 
@@ -248,11 +258,20 @@ convert_to_1password() {
 
     if [ -z "$ENV_FILE" ]; then
         log_error "--env-file is required"
+        echo "" >&2
+        log_suggestion "Specify the .env file to convert:"
+        log_command "op-env-manager convert --env-file=\".env.template\" --vault=\"VaultName\""
+        echo "" >&2
         usage
     fi
 
     if [ -z "$VAULT" ]; then
         log_error "--vault is required"
+        echo "" >&2
+        log_suggestion "Specify target vault name:"
+        log_command "op-env-manager convert --env-file=\"$ENV_FILE\" --vault=\"VaultName\""
+        echo "" >&2
+        suggest_vault_list
         usage
     fi
 
@@ -269,6 +288,18 @@ convert_to_1password() {
 
     if [ -z "$resolved_vars" ]; then
         log_error "No variables found or resolved in $ENV_FILE"
+        echo "" >&2
+        log_suggestion "Check your .env file:"
+        log_command "cat \"$ENV_FILE\""
+        echo "" >&2
+        log_troubleshoot "Common issues:"
+        echo "    1. File is empty or contains only comments" >&2
+        echo "    2. All op:// references failed to resolve" >&2
+        echo "    3. Variables don't follow KEY=value format" >&2
+        echo "" >&2
+        log_info "Example .env format for convert:"
+        log_command "API_KEY=op://Personal/myapp-API_KEY/password"
+        log_command "DATABASE_URL=postgresql://user:op://Personal/myapp-DB_PASS/password@host/db"
         exit 1
     fi
 

@@ -63,6 +63,7 @@ graph LR
 ## Features
 
 ✅ **Bidirectional Sync** - Push `.env` → 1Password, Inject 1Password → `.env`
+✅ **Multiline Values** - Support for private keys, certificates, JSON configs (v0.2.0+)
 ✅ **Multiple Vaults** - Separate dev, staging, production secrets
 ✅ **Dry Run Mode** - Preview changes before applying
 ✅ **Runtime Injection** - Run commands with secrets (no disk storage)
@@ -343,6 +344,55 @@ Using --template flag:
 
   # Run and save template
   op-env-manager run --vault "Personal" --template -- docker compose up
+```
+
+### Multiline Values (v0.2.0+)
+
+The tool supports multiline values for private keys, certificates, and JSON configurations.
+
+**Supported format:**
+```bash
+# Single-line values (as before)
+API_KEY=simple_value
+DATABASE_URL="postgresql://localhost/db"
+
+# Multiline values (wrap in double quotes)
+PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA1234567890...
+aBcDeFgHiJkLmNoPqRsTuVwXyZ...
+-----END RSA PRIVATE KEY-----"
+
+SSL_CERT="-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAKZ...
+-----END CERTIFICATE-----"
+
+JSON_CONFIG="{
+  \"database\": {
+    \"host\": \"localhost\",
+    \"port\": 5432
+  },
+  \"cache\": {
+    \"ttl\": 3600
+  }
+}"
+```
+
+**How it works:**
+- Multiline values must be enclosed in double quotes
+- When pushed to 1Password, newlines are converted to `\n` escape sequences
+- When injected back, escape sequences are converted to actual newlines
+- The injected `.env` file preserves the multiline format with quotes
+
+**Example usage:**
+```bash
+# Push .env with multiline values
+op-env-manager push --vault "Personal" --env .env.production
+
+# Inject back - multiline values are restored
+op-env-manager inject --vault "Personal" --output .env.local
+
+# Use with runtime injection (no temp files)
+op-env-manager run --vault "Personal" -- docker compose up
 ```
 
 ## Workflows
