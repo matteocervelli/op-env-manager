@@ -37,3 +37,19 @@ log_warning() {
 log_error() {
     echo -e "${RED}✗ $1${NC}" >&2
 }
+
+log_suggestion() {
+    echo -e "${YELLOW}  💡 $1${NC}" >&2
+}
+
+log_command() {
+    echo -e "${CYAN}    $1${NC}" >&2
+}
+
+log_troubleshoot() {
+    echo -e "${BLUE}  🔍 $1${NC}" >&2
+}
+
+log_divider() {
+    echo -e "${NC}  ────────────────────────────────${NC}" >&2
+}
