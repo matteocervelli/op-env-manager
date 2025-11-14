@@ -8,6 +8,7 @@ set -eo pipefail
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/logger.sh"
 source "$LIB_DIR/error_helpers.sh"
+source "$LIB_DIR/retry.sh"
 
 # Global variables for standalone command
 VAULT=""
@@ -85,7 +86,7 @@ get_field_names_from_item() {
     error_output=$(mktemp)
     trap 'rm -f "$error_output"' EXIT
 
-    item_json=$(op item get "$item" --vault "$vault" --format json 2>"$error_output")
+    item_json=$(retry_with_backoff "get item from vault" op item get "$item" --vault "$vault" --format json 2>"$error_output")
 
     if [ -z "$item_json" ]; then
         local error_msg

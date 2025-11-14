@@ -19,6 +19,8 @@ LIB_DIR="$PROJECT_ROOT/lib"
 # Source utilities
 source "$LIB_DIR/logger.sh"
 source "$LIB_DIR/error_helpers.sh"
+source "$LIB_DIR/retry.sh"
+source "$LIB_DIR/progress.sh"
 
 # Version
 VERSION="0.1.0"
@@ -70,6 +72,7 @@ EXAMPLES:
 GLOBAL OPTIONS:
     -h, --help      Show help
     -v, --version   Show version
+    -q, --quiet     Suppress all non-error output
 
 For more information and documentation:
     https://github.com/matteocervelli/op-env-manager
@@ -218,7 +221,7 @@ run_with_secrets() {
     # Get item to retrieve field names
     log_step "Building secret references..."
     local item_json
-    item_json=$(op item get "$item" --vault "$vault" --format json 2>/dev/null)
+    item_json=$(retry_with_backoff "get item from vault" op item get "$item" --vault "$vault" --format json 2>/dev/null)
 
     if [ -z "$item_json" ]; then
         log_error "Item not found: $item in vault $vault"
@@ -314,6 +317,26 @@ main() {
     if [ $# -eq 0 ]; then
         usage
     fi
+
+    # Parse global flags first
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -q|--quiet)
+                export OP_QUIET_MODE=true
+                shift
+                ;;
+            -h|--help)
+                usage
+                ;;
+            -v|--version)
+                show_version
+                ;;
+            *)
+                # Not a global flag, treat as command
+                break
+                ;;
+        esac
+    done
 
     local command="$1"
     shift

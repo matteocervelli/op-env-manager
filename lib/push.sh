@@ -8,6 +8,8 @@ set -eo pipefail
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/logger.sh"
 source "$LIB_DIR/error_helpers.sh"
+source "$LIB_DIR/retry.sh"
+source "$LIB_DIR/progress.sh"
 
 # Global variables
 ENV_FILE=".env"
@@ -218,12 +220,20 @@ push_to_1password() {
     local count=0
     local item_title="$ITEM_NAME"
 
+    # Count total variables for progress tracking
+    local total_vars
+    total_vars=$(echo "$vars" | grep -c '^[^[:space:]]' || true)
+
     if [ "$DRY_RUN" = true ]; then
         log_info "[DRY RUN] Would create/update item: $item_title"
         if [ -n "$SECTION" ]; then
             log_info "[DRY RUN] Section: $SECTION"
         fi
         echo ""
+
+        # Initialize progress bar for dry run
+        init_progress "$total_vars" "Processing variables"
+
         while IFS='=' read -r key value; do
             if [ -n "$key" ]; then
                 if [ -n "$SECTION" ]; then
@@ -232,12 +242,15 @@ push_to_1password() {
                     log_info "[DRY RUN] Would set: ${key}[password]"
                 fi
                 ((count++))
+                update_progress "$count"
             fi
         done <<< "$vars"
+
+        finish_progress
     else
         # Check if item exists
         local item_exists=false
-        if op item get "$item_title" --vault "$VAULT" &> /dev/null 2>&1; then
+        if retry_with_backoff "check if item exists" op item get "$item_title" --vault "$VAULT" &> /dev/null; then
             item_exists=true
             log_info "Updating existing item: $item_title"
         else
@@ -250,6 +263,9 @@ push_to_1password() {
         temp_fields=$(mktemp)
         trap 'rm -f "$temp_fields"' EXIT
 
+        # Initialize progress bar for actual push
+        init_progress "$total_vars" "Pushing variables"
+
         while IFS='=' read -r key value; do
             if [ -n "$key" ]; then
                 if [ -n "$SECTION" ]; then
@@ -260,8 +276,11 @@ push_to_1password() {
                     log_success "Setting: $key"
                 fi
                 ((count++))
+                update_progress "$count"
             fi
         done <<< "$vars"
+
+        finish_progress
 
         # Read field assignments into array
         local field_args=()
@@ -274,7 +293,7 @@ push_to_1password() {
         local result
         if [ "$item_exists" = true ]; then
             # Update existing item - process all fields at once
-            result=$(op item edit "$item_title" --vault "$VAULT" "${field_args[@]}" 2>&1)
+            result=$(retry_with_backoff "update item with fields" op item edit "$item_title" --vault "$VAULT" "${field_args[@]}" 2>&1)
             if [ $? -ne 0 ]; then
                 echo ""
                 log_error "Failed to update item in 1Password"
@@ -299,7 +318,7 @@ push_to_1password() {
         else
             # Create new item with first field, then add rest with edit
             log_info "Creating item..."
-            result=$(op item create --category="Secure Note" \
+            result=$(retry_with_backoff "create new item" op item create --category="Secure Note" \
                 --title="$item_title" \
                 --vault="$VAULT" \
                 --tags="op-env-manager" \
@@ -333,7 +352,7 @@ push_to_1password() {
             if [ ${#field_args[@]} -gt 1 ]; then
                 log_info "Adding remaining fields..."
                 local remaining_fields=("${field_args[@]:1}")
-                result=$(op item edit "$item_title" --vault "$VAULT" "${remaining_fields[@]}" 2>&1)
+                result=$(retry_with_backoff "add remaining fields" op item edit "$item_title" --vault "$VAULT" "${remaining_fields[@]}" 2>&1)
                 if [ $? -ne 0 ]; then
                     echo ""
                     log_error "Failed to add remaining fields to item"

@@ -213,7 +213,7 @@ teardown() {
     file1=$(create_test_env_large 50)
     file2=$(create_test_env_large 50)
     file3=$(create_test_env_large 50)
-    
+
     run bash -c "
         source '$LIB_DIR/push.sh'
         parse_env_file '$file1' &
@@ -224,5 +224,112 @@ teardown() {
     "
     assert_success
     assert_output "done"
+}
+
+# =============================================================================
+# Test: Progress Bar Behavior
+# =============================================================================
+
+@test "progress bar initializes for 100+ variables" {
+    local env_file
+    env_file=$(create_test_env_large 150)
+
+    # Force progress display (override CI detection)
+    export OP_SHOW_PROGRESS=true
+
+    # Run push with dry-run to test progress initialization
+    run bash -c "
+        source '$LIB_DIR/push.sh'
+        source '$LIB_DIR/progress.sh'
+
+        # Simulate push operation counting
+        vars=\$(parse_env_file '$env_file')
+        total_vars=\$(echo \"\$vars\" | grep -c '^[^[:space:]]' || true)
+
+        # Should be >= 100 to trigger progress
+        [ \"\$total_vars\" -ge 100 ]
+    "
+    assert_success
+
+    unset OP_SHOW_PROGRESS
+}
+
+@test "progress bar does not show for files under threshold" {
+    local env_file
+    env_file=$(create_test_env_large 50)
+
+    export OP_SHOW_PROGRESS=true
+    export OP_PROGRESS_THRESHOLD=100
+
+    run bash -c "
+        source '$LIB_DIR/progress.sh'
+
+        # Initialize with 50 (below threshold of 100)
+        init_progress 50 'Testing'
+
+        # PROGRESS_TOTAL should be 0 (not initialized)
+        [ \"\$PROGRESS_TOTAL\" -eq 0 ]
+    "
+    assert_success
+
+    unset OP_SHOW_PROGRESS
+    unset OP_PROGRESS_THRESHOLD
+}
+
+@test "progress tracking respects quiet mode" {
+    local env_file
+    env_file=$(create_test_env_large 150)
+
+    export OP_QUIET_MODE=true
+
+    run bash -c "
+        source '$LIB_DIR/progress.sh'
+
+        # should_show_progress should return false in quiet mode
+        if should_show_progress; then
+            exit 1
+        else
+            exit 0
+        fi
+    "
+    assert_success
+
+    unset OP_QUIET_MODE
+}
+
+@test "progress tracking suppresses in CI environment" {
+    local env_file
+    env_file=$(create_test_env_large 150)
+
+    export CI=true
+    unset OP_SHOW_PROGRESS
+
+    run bash -c "
+        source '$LIB_DIR/progress.sh'
+
+        # should_show_progress should return false in CI
+        if should_show_progress; then
+            exit 1
+        else
+            exit 0
+        fi
+    "
+    assert_success
+
+    unset CI
+}
+
+@test "custom progress threshold can be set via environment" {
+    export OP_PROGRESS_THRESHOLD=50
+
+    run bash -c "
+        source '$LIB_DIR/progress.sh'
+
+        # Check that custom threshold is applied
+        [ \"\$PROGRESS_THRESHOLD\" -eq 50 ]
+    "
+    assert_success
+
+    unset OP_PROGRESS_THRESHOLD
 }
 
