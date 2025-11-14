@@ -363,16 +363,16 @@ main() {
         exit 0
     fi
 
-    # Parse local .env file
-    log_step "Parsing local .env file..."
-    local local_vars
-    local_vars=$(parse_env_file "$ENV_FILE")
-    local local_count=$(echo "$local_vars" | grep -c "=" || echo "0")
-    log_success "Found $local_count variables in local file"
+    # Parse local .env file and fetch from 1Password in parallel (optimization)
+    log_step "Fetching data from local and remote sources (parallel)..."
 
-    # Get fields from 1Password
-    log_step "Fetching fields from 1Password..."
-    local remote_vars
+    # Create temporary files for parallel operations
+    local local_temp=$(mktemp)
+    local remote_temp=$(mktemp)
+    local remote_status_temp=$(mktemp)
+
+    # Cleanup temps on exit
+    trap 'rm -f "$local_temp" "$remote_temp" "$remote_status_temp"' EXIT
 
     # Build item title (with section suffix if specified)
     local item_title="$ITEM_NAME"
@@ -380,8 +380,30 @@ main() {
         item_title="${ITEM_NAME}_${SECTION}"
     fi
 
-    # Check if item exists
-    if ! retry_with_backoff "check if item exists" op item get "$item_title" --vault "$VAULT" &> /dev/null; then
+    # Start local parse in background
+    {
+        parse_env_file "$ENV_FILE" > "$local_temp"
+    } &
+    local local_pid=$!
+
+    # Start remote fetch in background
+    {
+        # Check if item exists
+        if retry_with_backoff "check if item exists" op item get "$item_title" --vault "$VAULT" &> /dev/null; then
+            get_fields_from_item "$VAULT" "$ITEM_NAME" "$SECTION" > "$remote_temp"
+            echo "0" > "$remote_status_temp"
+        else
+            echo "1" > "$remote_status_temp"
+        fi
+    } &
+    local remote_pid=$!
+
+    # Wait for both operations to complete
+    wait $local_pid $remote_pid
+
+    # Check remote status
+    local remote_status=$(cat "$remote_status_temp")
+    if [ "$remote_status" != "0" ]; then
         log_error "Item not found: $item_title in vault $VAULT"
         echo "" >&2
         suggest_item_push "$VAULT" "$ITEM_NAME" "$ENV_FILE"
@@ -390,7 +412,14 @@ main() {
         exit 2
     fi
 
-    remote_vars=$(get_fields_from_item "$VAULT" "$ITEM_NAME" "$SECTION")
+    # Read results
+    local local_vars=$(cat "$local_temp")
+    local remote_vars=$(cat "$remote_temp")
+
+    # Display results
+    local local_count=$(echo "$local_vars" | grep -c "=" || echo "0")
+    log_success "Found $local_count variables in local file"
+
     local remote_count=$(echo "$remote_vars" | grep -c "=" || echo "0")
     log_success "Found $remote_count variables in 1Password"
     echo ""

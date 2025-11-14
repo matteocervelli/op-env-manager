@@ -19,6 +19,9 @@ DRY_RUN=false
 SAVE_TEMPLATE=false
 TEMPLATE_OUTPUT=".env.op"
 
+# Performance optimization: Item metadata cache (command-scoped)
+declare -A ITEM_CACHE
+
 # Show usage
 usage() {
     cat << EOF
@@ -101,6 +104,28 @@ check_op_cli() {
     fi
 
     log_success "1Password CLI authenticated"
+}
+
+# Check if item exists with caching (optimization)
+# Cache key format: "vault:item"
+check_item_exists_cached() {
+    local vault="$1"
+    local item="$2"
+    local cache_key="${vault}:${item}"
+
+    # Check cache first
+    if [ -n "${ITEM_CACHE[$cache_key]:-}" ]; then
+        return "${ITEM_CACHE[$cache_key]}"
+    fi
+
+    # Not in cache, check with 1Password
+    if retry_with_backoff "check if item exists" op item get "$item" --vault "$vault" &> /dev/null; then
+        ITEM_CACHE[$cache_key]=0
+        return 0
+    else
+        ITEM_CACHE[$cache_key]=1
+        return 1
+    fi
 }
 
 # Detect if a value contains op:// reference
@@ -191,7 +216,66 @@ resolve_op_reference() {
     echo "$value"
 }
 
-# Parse .env file and resolve op:// references
+# Bulk resolve op:// references in parallel (optimization)
+# Input: List of "key|op_ref" pairs (one per line)
+# Output: List of "key|resolved_value" pairs
+bulk_resolve_op_references() {
+    local refs_input="$1"  # Format: "key|op_ref" per line
+
+    if [ -z "$refs_input" ]; then
+        return 0
+    fi
+
+    # Count references for progress
+    local ref_count=$(echo "$refs_input" | wc -l | tr -d ' ')
+
+    if [ "$DRY_RUN" = true ]; then
+        # In dry-run, just echo mock resolutions
+        while IFS='|' read -r key ref; do
+            echo "$key|[RESOLVED:$ref]"
+        done <<< "$refs_input"
+        return 0
+    fi
+
+    log_info "Resolving $ref_count op:// references in parallel..." >&2
+
+    # Create temporary directory for parallel results
+    local temp_dir=$(mktemp -d)
+    trap 'rm -rf "$temp_dir"' EXIT
+
+    # Start parallel resolution jobs
+    local pids=()
+    local job_id=0
+
+    while IFS='|' read -r key ref; do
+        {
+            local result_file="$temp_dir/result_${job_id}"
+            local value
+            value=$(retry_with_backoff "resolve secret reference" op read "$ref" 2>&1)
+            if [ $? -eq 0 ]; then
+                echo "$key|$value" > "$result_file"
+            else
+                echo "$key|ERROR:$value" > "$result_file"
+            fi
+        } &
+        pids+=($!)
+        job_id=$((job_id + 1))
+    done <<< "$refs_input"
+
+    # Wait for all parallel jobs
+    for pid in "${pids[@]}"; do
+        wait "$pid"
+    done
+
+    # Collect results
+    for result_file in "$temp_dir"/result_*; do
+        if [ -f "$result_file" ]; then
+            cat "$result_file"
+        fi
+    done
+}
+
+# Parse .env file and resolve op:// references (optimized with bulk resolution)
 parse_and_resolve_env_file() {
     local env_file="$1"
 
@@ -201,7 +285,12 @@ parse_and_resolve_env_file() {
         exit 1
     fi
 
-    # Parse .env file, ignore comments and empty lines
+    # First pass: Collect all op:// references and non-secret variables
+    declare -A var_map          # All variables (key -> original_value)
+    declare -A ref_map          # Variables with op:// refs (key -> op_ref)
+    declare -A embedded_map     # Track if op:// is embedded in value (key -> original_value)
+    local refs_to_resolve=""    # Bulk resolution input
+
     while IFS= read -r line || [ -n "$line" ]; do
         # Skip comments and empty lines
         if [[ "$line" =~ ^[[:space:]]*# ]] || [[ "$line" =~ ^[[:space:]]*$ ]]; then
@@ -224,32 +313,61 @@ parse_and_resolve_env_file() {
             value="${value#\'}"
 
             if [ -n "$key" ]; then
+                var_map["$key"]="$value"
+
                 # Check if value contains op:// reference
                 if has_op_reference "$value"; then
                     local op_ref
                     op_ref=$(extract_op_reference "$value")
 
                     if [ -n "$op_ref" ]; then
-                        # Resolve the reference
-                        local resolved_value
-                        resolved_value=$(resolve_op_reference "$op_ref")
-
-                        if [ $? -eq 0 ]; then
-                            # Replace the op:// reference with resolved value
-                            # Handle cases where op:// is embedded in a larger string
-                            value="${value/$op_ref/$resolved_value}"
-                            echo "$key=$value"
-                        else
-                            log_warning "Skipping $key due to resolution failure"
-                        fi
+                        ref_map["$key"]="$op_ref"
+                        embedded_map["$key"]="$value"
+                        refs_to_resolve+="$key|$op_ref"$'\n'
                     fi
-                else
-                    # No op:// reference, include as-is
-                    echo "$key=$value"
                 fi
             fi
         fi
     done < "$env_file"
+
+    # Second pass: Bulk resolve all op:// references in parallel
+    declare -A resolved_map  # Resolved values (key -> resolved_value)
+    local resolution_results=""
+
+    if [ -n "$refs_to_resolve" ]; then
+        resolution_results=$(bulk_resolve_op_references "$refs_to_resolve")
+
+        # Parse resolution results
+        while IFS='|' read -r key resolved_value; do
+            if [ -n "$key" ]; then
+                if [[ "$resolved_value" == ERROR:* ]]; then
+                    log_warning "Skipping $key due to resolution failure: ${resolved_value#ERROR:}" >&2
+                else
+                    resolved_map["$key"]="$resolved_value"
+                fi
+            fi
+        done <<< "$resolution_results"
+    fi
+
+    # Third pass: Output final variables
+    for key in "${!var_map[@]}"; do
+        if [ -n "${ref_map[$key]:-}" ]; then
+            # Variable has op:// reference
+            if [ -n "${resolved_map[$key]:-}" ]; then
+                local original_value="${embedded_map[$key]}"
+                local op_ref="${ref_map[$key]}"
+                local resolved_value="${resolved_map[$key]}"
+
+                # Replace op:// reference with resolved value
+                local final_value="${original_value/$op_ref/$resolved_value}"
+                echo "$key=$final_value"
+            fi
+            # If not resolved, skip (already warned in resolution phase)
+        else
+            # No op:// reference, output as-is
+            echo "$key=${var_map[$key]}"
+        fi
+    done
 }
 
 # Convert and push to 1Password
@@ -338,9 +456,9 @@ convert_to_1password() {
             fi
         done <<< "$resolved_vars"
     else
-        # Check if item exists
+        # Check if item exists (using cache for performance)
         local item_exists=false
-        if retry_with_backoff "check if item exists" op item get "$item_title" --vault "$VAULT" &> /dev/null; then
+        if check_item_exists_cached "$VAULT" "$item_title"; then
             item_exists=true
             log_info "Updating existing item: $item_title"
         else

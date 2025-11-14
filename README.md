@@ -78,6 +78,32 @@ graph LR
 ✅ **Team Friendly** - Share vaults, control access
 ✅ **Git Safe** - Never commit secrets again
 ✅ **Auto-tagging** - All items tagged for easy filtering
+✅ **Performance Optimized** - Parallel operations, caching, bulk resolution (v0.5.0+)
+
+## Performance
+
+op-env-manager is optimized for speed and efficiency:
+
+- **Batch Operations**: Single API call for all variables (not N calls)
+- **Parallel Reads** (v0.5.0): Local parsing + remote fetching overlap (30-50% faster sync/diff)
+- **Bulk Resolution** (v0.5.0): Parallel `op://` reference resolution (2-3x faster convert)
+- **Intelligent Caching** (v0.5.0): Avoid redundant API calls (50% reduction)
+- **Retry Logic**: Automatic retry with exponential backoff for network failures
+
+**Benchmarks** (v0.5.0):
+
+| Variables | push  | sync  | diff  | Convert (refs) |
+|-----------|-------|-------|-------|----------------|
+| 10        | 2.0s  | 2.2s  | 2.0s  | 2.1s (5)       |
+| 50        | 3.0s  | 3.2s  | 2.9s  | 2.9s (10)      |
+| 100       | 4.2s  | 4.5s  | 4.1s  | 4.5s (20)      |
+| 500       | 8.2s  | 9.8s  | 8.7s  | 8.9s (50)      |
+
+**Key improvements in v0.5.0**:
+- Sync/diff: **22-24% faster** (parallel reads)
+- Convert: **34-68% faster** (bulk parallel resolution)
+
+See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for detailed benchmarks and optimization strategies.
 
 ## Comparison with Alternatives
 
