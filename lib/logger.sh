@@ -11,30 +11,42 @@ MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Check if output should be suppressed (quiet mode)
+is_quiet_mode() {
+    [[ "${OP_QUIET_MODE}" == "true" ]]
+}
+
 # Log levels
 log_header() {
+    is_quiet_mode && return 0
     echo -e "${MAGENTA}========================================${NC}"
     echo -e "${MAGENTA}$1${NC}"
     echo -e "${MAGENTA}========================================${NC}"
 }
 
 log_step() {
+    is_quiet_mode && return 0
     echo -e "${CYAN}▶ $1${NC}"
 }
 
 log_info() {
+    is_quiet_mode && return 0
     echo -e "${BLUE}ℹ $1${NC}"
 }
 
 log_success() {
+    is_quiet_mode && return 0
     echo -e "${GREEN}✓ $1${NC}"
 }
 
 log_warning() {
+    # Critical warnings are always shown (even in quiet mode)
+    # To suppress a warning in quiet mode, use log_info instead
     echo -e "${YELLOW}⚠ $1${NC}"
 }
 
 log_error() {
+    # Errors are always shown (even in quiet mode)
     echo -e "${RED}✗ $1${NC}" >&2
 }
 

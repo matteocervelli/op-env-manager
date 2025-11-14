@@ -20,6 +20,7 @@ LIB_DIR="$PROJECT_ROOT/lib"
 source "$LIB_DIR/logger.sh"
 source "$LIB_DIR/error_helpers.sh"
 source "$LIB_DIR/retry.sh"
+source "$LIB_DIR/progress.sh"
 
 # Version
 VERSION="0.1.0"
@@ -71,6 +72,7 @@ EXAMPLES:
 GLOBAL OPTIONS:
     -h, --help      Show help
     -v, --version   Show version
+    -q, --quiet     Suppress all non-error output
 
 For more information and documentation:
     https://github.com/matteocervelli/op-env-manager
@@ -315,6 +317,26 @@ main() {
     if [ $# -eq 0 ]; then
         usage
     fi
+
+    # Parse global flags first
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -q|--quiet)
+                export OP_QUIET_MODE=true
+                shift
+                ;;
+            -h|--help)
+                usage
+                ;;
+            -v|--version)
+                show_version
+                ;;
+            *)
+                # Not a global flag, treat as command
+                break
+                ;;
+        esac
+    done
 
     local command="$1"
     shift

@@ -9,6 +9,7 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/logger.sh"
 source "$LIB_DIR/error_helpers.sh"
 source "$LIB_DIR/retry.sh"
+source "$LIB_DIR/progress.sh"
 
 # Global variables
 OUTPUT_FILE=".env"
@@ -180,6 +181,13 @@ inject_to_env_file() {
     log_step "Retrieving secrets..."
     echo ""
 
+    # Count total fields for progress tracking
+    local total_fields
+    total_fields=$(echo "$fields" | grep -c '^[^[:space:]]' || true)
+
+    # Initialize progress bar
+    init_progress "$total_fields" "Injecting variables"
+
     while IFS='=' read -r key value; do
         if [ -n "$key" ]; then
             if [ "$DRY_RUN" = true ]; then
@@ -200,8 +208,11 @@ inject_to_env_file() {
                 log_success "Retrieved: $key"
             fi
             ((count++))
+            update_progress "$count"
         fi
     done <<< "$fields"
+
+    finish_progress
 
     echo ""
 

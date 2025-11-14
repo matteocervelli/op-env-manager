@@ -64,6 +64,8 @@ graph LR
 
 ✅ **Bidirectional Sync** - Push `.env` → 1Password, Inject 1Password → `.env`
 ✅ **Multiline Values** - Support for private keys, certificates, JSON configs (v0.2.0+)
+✅ **Progress Indicators** - ASCII progress bars for operations with 100+ variables (v0.3.0+)
+✅ **Quiet Mode** - `--quiet` flag for CI/CD pipelines and scripts (v0.3.0+)
 ✅ **Multiple Vaults** - Separate dev, staging, production secrets
 ✅ **Dry Run Mode** - Preview changes before applying
 ✅ **Runtime Injection** - Run commands with secrets (no disk storage)
@@ -199,7 +201,35 @@ op-env-manager run --vault "Personal" -- npm run dev
 ### Commands
 
 ```bash
-op-env-manager <command> [options]
+op-env-manager [global options] <command> [options]
+```
+
+### Global Options
+
+Available across all commands:
+
+- `-q, --quiet` - Suppress all non-error output (useful for CI/CD pipelines)
+- `-h, --help` - Show help message
+- `-v, --version` - Show version information
+
+**Progress Indicators** (v0.3.0+):
+- Operations with 100+ variables automatically show ASCII progress bars: `[=====>     ] 45/150 (30%)`
+- Progress bars auto-detect terminal type (no output in pipes/redirects)
+- Auto-suppressed in CI/CD environments (detects `CI`, `GITHUB_ACTIONS`, etc.)
+- Can be controlled via environment variables:
+  - `OP_SHOW_PROGRESS=true|false` - Force enable/disable progress bars
+  - `OP_PROGRESS_THRESHOLD=100` - Customize threshold (default: 100 variables)
+
+**Examples:**
+```bash
+# Quiet mode for scripts/CI
+op-env-manager --quiet push --vault "Production" --env .env.prod
+
+# Force progress display (override CI detection)
+OP_SHOW_PROGRESS=true op-env-manager push --vault "Personal" --env large.env
+
+# Custom threshold (show progress for 50+ variables)
+OP_PROGRESS_THRESHOLD=50 op-env-manager inject --vault "Dev"
 ```
 
 #### `push` - Upload .env to 1Password
