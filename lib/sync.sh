@@ -524,33 +524,67 @@ main() {
     fi
     echo ""
 
-    # Parse local .env file
-    log_step "Parsing local .env file..."
-    local local_vars
-    if [ -f "$ENV_FILE" ]; then
-        local_vars=$(parse_env_file "$ENV_FILE")
-    else
-        local_vars=""
-        log_warning "Local file does not exist: $ENV_FILE"
-    fi
+    # Parse local .env file and fetch from 1Password in parallel (optimization)
+    log_step "Fetching data from local and remote sources (parallel)..."
+
+    # Create temporary files for parallel operations
+    local local_temp=$(mktemp)
+    local remote_temp=$(mktemp)
+    local local_error_temp=$(mktemp)
+    local remote_error_temp=$(mktemp)
+
+    # Cleanup temps on exit
+    trap 'rm -f "$local_temp" "$remote_temp" "$local_error_temp" "$remote_error_temp"' EXIT
+
+    # Start local parse in background
+    {
+        if [ -f "$ENV_FILE" ]; then
+            parse_env_file "$ENV_FILE" > "$local_temp" 2>"$local_error_temp"
+        else
+            echo "" > "$local_temp"
+            echo "Local file does not exist: $ENV_FILE" > "$local_error_temp"
+        fi
+    } &
+    local local_pid=$!
+
+    # Start remote fetch in background
+    {
+        local item_title="$ITEM_NAME"
+        if [ -n "$SECTION" ]; then
+            item_title="${ITEM_NAME}_${SECTION}"
+        fi
+
+        if retry_with_backoff "check if item exists" op item get "$item_title" --vault "$VAULT" &> /dev/null; then
+            get_fields_from_item "$VAULT" "$ITEM_NAME" "$SECTION" > "$remote_temp" 2>"$remote_error_temp"
+        else
+            echo "" > "$remote_temp"
+            echo "Item not found in 1Password (will be created)" > "$remote_error_temp"
+        fi
+    } &
+    local remote_pid=$!
+
+    # Wait for both operations to complete
+    wait $local_pid $remote_pid
+
+    # Read results
+    local local_vars=$(cat "$local_temp")
+    local remote_vars=$(cat "$remote_temp")
+    local local_error=$(cat "$local_error_temp")
+    local remote_error=$(cat "$remote_error_temp")
+
+    # Display results
     local local_count=$(echo "$local_vars" | grep -c "=" || echo "0")
     log_success "Found $local_count variables in local file"
 
-    # Get fields from 1Password
-    log_step "Fetching fields from 1Password..."
-    local remote_vars=""
-    local item_title="$ITEM_NAME"
-    if [ -n "$SECTION" ]; then
-        item_title="${ITEM_NAME}_${SECTION}"
+    if [ -n "$local_error" ] && [ "$local_count" -eq 0 ]; then
+        log_warning "$local_error"
     fi
 
-    if retry_with_backoff "check if item exists" op item get "$item_title" --vault "$VAULT" &> /dev/null; then
-        remote_vars=$(get_fields_from_item "$VAULT" "$ITEM_NAME" "$SECTION")
-        local remote_count=$(echo "$remote_vars" | grep -c "=" || echo "0")
+    local remote_count=$(echo "$remote_vars" | grep -c "=" || echo "0")
+    if [ "$remote_count" -gt 0 ]; then
         log_success "Found $remote_count variables in 1Password"
     else
-        log_warning "Item not found in 1Password (will be created)"
-        remote_vars=""
+        log_warning "$(cat "$remote_error_temp")"
     fi
     echo ""
 
