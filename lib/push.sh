@@ -9,6 +9,7 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/logger.sh"
 source "$LIB_DIR/error_helpers.sh"
 source "$LIB_DIR/retry.sh"
+source "$LIB_DIR/progress.sh"
 
 # Global variables
 ENV_FILE=".env"
@@ -219,12 +220,20 @@ push_to_1password() {
     local count=0
     local item_title="$ITEM_NAME"
 
+    # Count total variables for progress tracking
+    local total_vars
+    total_vars=$(echo "$vars" | grep -c '^[^[:space:]]' || true)
+
     if [ "$DRY_RUN" = true ]; then
         log_info "[DRY RUN] Would create/update item: $item_title"
         if [ -n "$SECTION" ]; then
             log_info "[DRY RUN] Section: $SECTION"
         fi
         echo ""
+
+        # Initialize progress bar for dry run
+        init_progress "$total_vars" "Processing variables"
+
         while IFS='=' read -r key value; do
             if [ -n "$key" ]; then
                 if [ -n "$SECTION" ]; then
@@ -233,8 +242,11 @@ push_to_1password() {
                     log_info "[DRY RUN] Would set: ${key}[password]"
                 fi
                 ((count++))
+                update_progress "$count"
             fi
         done <<< "$vars"
+
+        finish_progress
     else
         # Check if item exists
         local item_exists=false
@@ -251,6 +263,9 @@ push_to_1password() {
         temp_fields=$(mktemp)
         trap 'rm -f "$temp_fields"' EXIT
 
+        # Initialize progress bar for actual push
+        init_progress "$total_vars" "Pushing variables"
+
         while IFS='=' read -r key value; do
             if [ -n "$key" ]; then
                 if [ -n "$SECTION" ]; then
@@ -261,8 +276,11 @@ push_to_1password() {
                     log_success "Setting: $key"
                 fi
                 ((count++))
+                update_progress "$count"
             fi
         done <<< "$vars"
+
+        finish_progress
 
         # Read field assignments into array
         local field_args=()
