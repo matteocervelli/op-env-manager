@@ -38,6 +38,8 @@ COMMANDS:
     push        Push local .env file to 1Password vault
     inject      Inject secrets from 1Password to local .env file
     run         Run command with secrets injected from 1Password
+    diff        Compare local .env file with 1Password vault
+    sync        Bidirectional sync between local .env and 1Password
     convert     Convert .env files with op:// references to op-env-manager format
     template    Generate .env.op template file with op:// references
     init        Initialize 1Password vault structure (coming soon)
@@ -59,6 +61,12 @@ EXAMPLES:
 
     # Run command with injected secrets
     op-env-manager run --vault="Personal" --item="myapp" --section="dev" -- docker compose up
+
+    # Compare local .env with 1Password
+    op-env-manager diff --vault="Personal" --env-file=.env
+
+    # Sync local .env with 1Password (bidirectional)
+    op-env-manager sync --vault="Personal" --env-file=.env
 
     # Convert legacy .env with op:// references
     op-env-manager convert --vault="Personal" --item="myapp" --env-file=.env.template
@@ -352,6 +360,14 @@ main() {
             ;;
         run)
             run_with_secrets "$@"
+            ;;
+        diff)
+            source "$LIB_DIR/diff.sh"
+            main "$@"
+            ;;
+        sync)
+            source "$LIB_DIR/sync.sh"
+            main "$@"
             ;;
         convert)
             source "$LIB_DIR/convert.sh"

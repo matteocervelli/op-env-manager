@@ -18,6 +18,8 @@ by [Matteo Cervelli](https://github.com/matteocervelli)
 - **Push**: Upload your `.env` variables to 1Password for secure storage
 - **Inject**: Download secrets from 1Password into local `.env` files
 - **Run**: Execute commands with secrets injected from 1Password (no plaintext files!)
+- **Diff**: Compare local `.env` with 1Password to identify differences
+- **Sync**: Bidirectional synchronization with intelligent conflict resolution (v0.4.0+)
 - **Convert**: Migrate legacy `.env` files with `op://` references to op-env-manager format
 - **Template**: Generate `.env.op` files with `op://` references for version control
 
@@ -63,6 +65,9 @@ graph LR
 ## Features
 
 ✅ **Bidirectional Sync** - Push `.env` → 1Password, Inject 1Password → `.env`
+✅ **Intelligent Sync** - Smart conflict resolution with diff/sync commands (v0.4.0+)
+✅ **State Tracking** - Three-way merge with change detection (v0.4.0+)
+✅ **Conflict Resolution** - Interactive, ours, theirs, or newest strategies (v0.4.0+)
 ✅ **Multiline Values** - Support for private keys, certificates, JSON configs (v0.2.0+)
 ✅ **Progress Indicators** - ASCII progress bars for operations with 100+ variables (v0.3.0+)
 ✅ **Quiet Mode** - `--quiet` flag for CI/CD pipelines and scripts (v0.3.0+)
@@ -287,6 +292,102 @@ Examples:
   op-env-manager run --vault "Dev" --item "api" -- npm start
   op-env-manager run --vault "Staging" -- python manage.py migrate
   op-env-manager run --vault "Personal" --template -- npm start  # Also save .env.op
+```
+
+#### `diff` - Compare local .env with 1Password
+
+Compare your local `.env` file with the corresponding 1Password vault item to identify differences.
+
+```bash
+op-env-manager diff --vault VAULT [options]
+
+Options:
+  --vault VAULT       1Password vault name (required)
+  --env-file FILE     .env file to compare (default: .env)
+  --item NAME         Item name prefix (default: env-secrets)
+  --section SECTION   Environment section (e.g., dev, prod)
+  --dry-run           Preview without checking 1Password
+
+Exit Codes:
+  0   Files are identical (no differences)
+  1   Differences found
+  2   Error occurred
+
+Output Format:
+  +  Variable added in 1Password (not in local)
+  -  Variable removed (only in local, not in 1Password)
+  ±  Variable modified (different values)
+
+Examples:
+  # Compare local .env with 1Password
+  op-env-manager diff --vault "Personal"
+
+  # Compare specific environment
+  op-env-manager diff --vault "Projects" --item "myapp" --section "prod" --env-file .env.prod
+
+  # Preview what would be compared
+  op-env-manager diff --vault "Personal" --dry-run
+
+Use cases:
+  - Check what changed before syncing
+  - Verify push/inject operations
+  - Audit differences between local and remote
+  - CI/CD validation (exit code 0 = in sync)
+```
+
+#### `sync` - Bidirectional synchronization
+
+Intelligently synchronize your local `.env` file with 1Password, handling additions, deletions, and conflicts automatically.
+
+```bash
+op-env-manager sync --vault VAULT [options]
+
+Options:
+  --vault VAULT       1Password vault name (required)
+  --env-file FILE     .env file to sync (default: .env)
+  --item NAME         Item name prefix (default: env-secrets)
+  --section SECTION   Environment section (e.g., dev, prod)
+  --strategy STRATEGY Conflict resolution strategy (default: interactive)
+                      - interactive: Prompt for each conflict
+                      - ours:        Always prefer local values
+                      - theirs:      Always prefer 1Password values
+                      - newest:      Use most recently modified values
+  --no-backup         Skip automatic backup before sync
+  --dry-run           Preview what would be synced
+
+Sync Behavior:
+  + Added:      Variables only in 1Password are pulled to local
+  - Removed:    Variables only in local are removed from 1Password
+  ± Modified:   Variables with different values trigger conflict resolution
+  = Unchanged:  Variables with same values are skipped
+
+State Tracking:
+  Sync creates a .op-env-manager.state file to track the last sync state.
+  This enables accurate three-way merge and prevents false conflicts.
+
+Examples:
+  # Interactive sync (default - prompts for conflicts)
+  op-env-manager sync --vault "Personal"
+
+  # Automatic sync strategies
+  op-env-manager sync --vault "Projects" --item "myapp" --strategy ours     # Prefer local
+  op-env-manager sync --vault "Projects" --item "myapp" --strategy theirs   # Prefer remote
+  op-env-manager sync --vault "Projects" --item "myapp" --strategy newest   # Use timestamps
+
+  # Sync with environment sections
+  op-env-manager sync --vault "Projects" --item "myapp" --section "dev" --env-file .env.dev
+
+  # Preview changes before syncing
+  op-env-manager sync --vault "Personal" --dry-run
+
+  # Sync without backup (use cautiously)
+  op-env-manager sync --vault "Personal" --no-backup
+
+Use cases:
+  - Team collaboration (multiple people updating secrets)
+  - Multi-machine development (keep laptop and desktop in sync)
+  - Gradual migration (sync instead of full push/inject)
+  - Configuration drift prevention
 ```
 
 #### `convert` - Migrate from op:// reference format
