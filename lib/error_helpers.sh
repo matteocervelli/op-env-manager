@@ -293,3 +293,48 @@ explain_empty_result() {
     log_warning "No $context found"
     echo "" >&2
 }
+
+# Suggest vault creation
+suggest_vault_create() {
+    local vault_name="${1:-MyVault}"
+
+    echo "" >&2
+    log_suggestion "To create a new vault:"
+    log_command "op vault create \"$vault_name\""
+    echo "" >&2
+
+    log_info "Note: You need vault creation permissions in your 1Password account."
+    log_info "If you're using a shared account, ask your administrator."
+    echo "" >&2
+}
+
+# Create vault interactively (used by init command)
+# Usage: create_vault_interactive "vault_name"
+# Returns: 0 on success, 1 on failure
+create_vault_interactive() {
+    local vault_name="$1"
+
+    if ! command -v op &> /dev/null; then
+        log_error "1Password CLI (op) is not installed"
+        check_op_installed
+        return 1
+    fi
+
+    if ! op account list &> /dev/null; then
+        log_error "Not signed in to 1Password CLI"
+        check_op_authenticated
+        return 1
+    fi
+
+    log_step "Creating vault: $vault_name"
+
+    # Attempt to create vault
+    if op vault create "$vault_name" &> /dev/null; then
+        log_success "Vault created: $vault_name"
+        return 0
+    else
+        log_error "Failed to create vault: $vault_name"
+        suggest_vault_create "$vault_name"
+        return 1
+    fi
+}

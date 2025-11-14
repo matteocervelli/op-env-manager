@@ -309,15 +309,10 @@ run_with_secrets() {
     fi
 }
 
-# Init command (placeholder for future)
+# Init command - Interactive setup wizard
 init_vault() {
-    log_header "Initialize 1Password Vault Structure"
-    echo ""
-    log_warning "This feature is coming soon!"
-    echo ""
-    log_info "For now, just push your .env file to create the structure:"
-    echo "  op-env-manager push --vault \"YourVault\" --env .env"
-    exit 0
+    source "$LIB_DIR/init.sh"
+    init_vault_wizard "$@"
 }
 
 # Main command dispatcher

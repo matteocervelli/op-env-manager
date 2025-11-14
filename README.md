@@ -15,6 +15,7 @@ by [Matteo Cervelli](https://github.com/matteocervelli)
 
 `op-env-manager` is a command-line tool that bridges your local `.env` files and 1Password vaults, enabling:
 
+- **Init**: Interactive setup wizard for guided onboarding (~2 minutes) (v0.3.0+)
 - **Push**: Upload your `.env` variables to 1Password for secure storage
 - **Inject**: Download secrets from 1Password into local `.env` files
 - **Run**: Execute commands with secrets injected from 1Password (no plaintext files!)
@@ -197,7 +198,26 @@ brew install --cask 1password-cli
 op signin
 ```
 
-### 2. Push your .env to 1Password
+### 2. Run the Setup Wizard (Recommended)
+
+**New in v0.3.0**: The `init` command provides a guided setup experience:
+
+```bash
+# Interactive wizard - get started in ~2 minutes
+op-env-manager init
+```
+
+The wizard will guide you through:
+- ✅ Vault selection or creation
+- ✅ Item naming
+- ✅ .env file detection
+- ✅ Multi-environment setup (dev/staging/prod)
+- ✅ Initial push to 1Password
+- ✅ Optional template generation
+
+Or continue with manual setup below...
+
+### 3. Push your .env to 1Password (Manual)
 
 ```bash
 # Push .env to your Personal vault
@@ -207,7 +227,7 @@ op-env-manager push --vault "Personal" --env .env
 op-env-manager push --vault "Production" --env .env.production --item "myapp"
 ```
 
-### 3. Inject secrets from 1Password
+### 4. Inject secrets from 1Password
 
 ```bash
 # Inject to .env.local
@@ -217,7 +237,7 @@ op-env-manager inject --vault "Personal" --output .env.local
 op-env-manager inject --vault "Production" --item "myapp" --output .env.production
 ```
 
-### 4. Run commands with secrets
+### 5. Run commands with secrets
 
 ```bash
 # Run docker compose with secrets (no .env file created!)
@@ -261,6 +281,49 @@ OP_SHOW_PROGRESS=true op-env-manager push --vault "Personal" --env large.env
 
 # Custom threshold (show progress for 50+ variables)
 OP_PROGRESS_THRESHOLD=50 op-env-manager inject --vault "Dev"
+```
+
+#### `init` - Interactive Setup Wizard
+
+**New in v0.3.0**: Guided onboarding experience to set up op-env-manager with your 1Password vault.
+
+```bash
+op-env-manager init [options]
+
+Options:
+  --dry-run              Preview setup flow without making changes
+
+Interactive Flow:
+  1. Vault Selection:    Choose existing vault or create new one
+  2. Item Naming:        Set item name (default: env-secrets)
+  3. .env Detection:     Auto-detect .env files in current directory
+  4. Multi-Environment:  Optional setup for dev/staging/prod
+     - Separate Items:   myapp-dev, myapp-staging, myapp-prod
+     - Sections:         Single item with environment sections
+  5. Initial Push:       Upload selected .env file(s) to 1Password
+  6. Template:           Optionally generate .env.op template file
+  7. Success Summary:    Show next steps and example commands
+
+Features:
+  ✅ Vault creation support (if you have permissions)
+  ✅ Smart .env file detection (excludes .example, .bak, .op)
+  ✅ Multi-environment strategies (your choice)
+  ✅ Dry-run mode for preview
+  ✅ Guided best practices
+  ✅ < 2 minute setup time
+
+Examples:
+  # Run interactive wizard
+  op-env-manager init
+
+  # Preview setup flow without changes
+  op-env-manager init --dry-run
+
+Use Cases:
+  - First-time setup
+  - Onboarding new team members
+  - Setting up new projects
+  - Learning op-env-manager workflow
 ```
 
 #### `push` - Upload .env to 1Password
