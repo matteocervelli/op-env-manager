@@ -19,6 +19,7 @@ LIB_DIR="$PROJECT_ROOT/lib"
 # Source utilities
 source "$LIB_DIR/logger.sh"
 source "$LIB_DIR/error_helpers.sh"
+source "$LIB_DIR/retry.sh"
 
 # Version
 VERSION="0.1.0"
@@ -218,7 +219,7 @@ run_with_secrets() {
     # Get item to retrieve field names
     log_step "Building secret references..."
     local item_json
-    item_json=$(op item get "$item" --vault "$vault" --format json 2>/dev/null)
+    item_json=$(retry_with_backoff "get item from vault" op item get "$item" --vault "$vault" --format json 2>/dev/null)
 
     if [ -z "$item_json" ]; then
         log_error "Item not found: $item in vault $vault"

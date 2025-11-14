@@ -189,13 +189,22 @@ suggest_network_check() {
     echo "" >&2
     log_suggestion "Try these steps:"
     echo "    1. Check your internet connection" >&2
-    echo "    2. Retry the command" >&2
+    echo "    2. Retry the command (automatic retries are enabled)" >&2
     echo "    3. Use --dry-run to test without network calls" >&2
     echo "" >&2
 
     log_troubleshoot "If timeout persists:"
     log_command "# Check 1Password service status"
     log_command "op account list"
+    echo "" >&2
+
+    log_info "Retry configuration (via environment variables):"
+    echo "    OP_MAX_RETRIES=3       # Max retry attempts (default: 3)" >&2
+    echo "    OP_RETRY_DELAY=1       # Initial delay in seconds (default: 1)" >&2
+    echo "    OP_BACKOFF_FACTOR=2    # Exponential multiplier (default: 2)" >&2
+    echo "    OP_MAX_DELAY=30        # Max delay cap in seconds (default: 30)" >&2
+    echo "    OP_DISABLE_RETRY=true  # Disable retries for debugging" >&2
+    echo "    OP_RETRY_QUIET=true    # Silent retries (no log output)" >&2
     echo "" >&2
 }
 

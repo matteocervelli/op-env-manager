@@ -8,6 +8,7 @@ set -eo pipefail
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/logger.sh"
 source "$LIB_DIR/error_helpers.sh"
+source "$LIB_DIR/retry.sh"
 
 # Global variables
 ENV_FILE=""
@@ -162,8 +163,8 @@ resolve_op_reference() {
     # Show progress (helps debug slow operations)
     log_info "Resolving: $ref" >&2
 
-    # Use op read to resolve the reference
-    value=$(op read "$ref" 2>&1)
+    # Use op read to resolve the reference (with retry for network errors)
+    value=$(retry_with_backoff "resolve secret reference" op read "$ref" 2>&1)
     local exit_code=$?
 
     if [ $exit_code -ne 0 ]; then
@@ -339,7 +340,7 @@ convert_to_1password() {
     else
         # Check if item exists
         local item_exists=false
-        if op item get "$item_title" --vault "$VAULT" &> /dev/null 2>&1; then
+        if retry_with_backoff "check if item exists" op item get "$item_title" --vault "$VAULT" &> /dev/null; then
             item_exists=true
             log_info "Updating existing item: $item_title"
         else
@@ -384,7 +385,7 @@ convert_to_1password() {
         local result
         if [ "$item_exists" = true ]; then
             # Update existing item
-            result=$(op item edit "$item_title" --vault "$VAULT" "${field_args[@]}" 2>&1)
+            result=$(retry_with_backoff "update item with fields" op item edit "$item_title" --vault "$VAULT" "${field_args[@]}" 2>&1)
             if [ $? -ne 0 ]; then
                 echo ""
                 log_error "Failed to update item in 1Password"
@@ -394,7 +395,7 @@ convert_to_1password() {
         else
             # Create new item
             log_info "Creating item..."
-            result=$(op item create --category="Secure Note" \
+            result=$(retry_with_backoff "create new item" op item create --category="Secure Note" \
                 --title="$item_title" \
                 --vault="$VAULT" \
                 --tags="op-env-manager" \
@@ -410,7 +411,7 @@ convert_to_1password() {
             if [ ${#field_args[@]} -gt 1 ]; then
                 log_info "Adding remaining fields..."
                 local remaining_fields=("${field_args[@]:1}")
-                result=$(op item edit "$item_title" --vault "$VAULT" "${remaining_fields[@]}" 2>&1)
+                result=$(retry_with_backoff "add remaining fields" op item edit "$item_title" --vault "$VAULT" "${remaining_fields[@]}" 2>&1)
                 if [ $? -ne 0 ]; then
                     echo ""
                     log_error "Failed to add remaining fields to item"
