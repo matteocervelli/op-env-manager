@@ -19,8 +19,8 @@ by [Matteo Cervelli](https://github.com/matteocervelli)
 - **Push**: Upload your `.env` variables to 1Password for secure storage
 - **Inject**: Download secrets from 1Password into local `.env` files
 - **Run**: Execute commands with secrets injected from 1Password (no plaintext files!)
-- **Diff**: Compare local `.env` with 1Password to identify differences
-- **Sync**: Bidirectional synchronization with intelligent conflict resolution (v0.4.0+)
+- **Diff**: Compare local `.env` with 1Password to identify differences (planned v0.4.0)
+- **Sync**: Bidirectional synchronization with intelligent conflict resolution (planned v0.4.0)
 - **Convert**: Migrate legacy `.env` files with `op://` references to op-env-manager format
 - **Template**: Generate `.env.op` files with `op://` references for version control
 
@@ -66,12 +66,11 @@ graph LR
 ## Features
 
 ✅ **Bidirectional Sync** - Push `.env` → 1Password, Inject 1Password → `.env`
-✅ **Intelligent Sync** - Smart conflict resolution with diff/sync commands (v0.4.0+)
-✅ **State Tracking** - Three-way merge with change detection (v0.4.0+)
-✅ **Conflict Resolution** - Interactive, ours, theirs, or newest strategies (v0.4.0+)
 ✅ **Multiline Values** - Support for private keys, certificates, JSON configs (v0.2.0+)
 ✅ **Progress Indicators** - ASCII progress bars for operations with 100+ variables (v0.3.0+)
 ✅ **Quiet Mode** - `--quiet` flag for CI/CD pipelines and scripts (v0.3.0+)
+✅ **Retry Logic** - Automatic retry with exponential backoff for network failures (v0.2.0+)
+✅ **Interactive Setup** - Guided `init` wizard for new users (v0.3.0+)
 ✅ **Multiple Vaults** - Separate dev, staging, production secrets
 ✅ **Dry Run Mode** - Preview changes before applying
 ✅ **Runtime Injection** - Run commands with secrets (no disk storage)
@@ -79,32 +78,33 @@ graph LR
 ✅ **Team Friendly** - Share vaults, control access
 ✅ **Git Safe** - Never commit secrets again
 ✅ **Auto-tagging** - All items tagged for easy filtering
-✅ **Performance Optimized** - Parallel operations, caching, bulk resolution (v0.5.0+)
+🔜 **Intelligent Sync** - Smart conflict resolution with diff/sync commands (planned v0.4.0)
+🔜 **Performance Optimized** - Parallel operations, caching, bulk resolution (planned v0.5.0)
 
 ## Performance
 
-op-env-manager is optimized for speed and efficiency:
+op-env-manager is designed for speed and efficiency:
 
 - **Batch Operations**: Single API call for all variables (not N calls)
-- **Parallel Reads** (v0.5.0): Local parsing + remote fetching overlap (30-50% faster sync/diff)
-- **Bulk Resolution** (v0.5.0): Parallel `op://` reference resolution (2-3x faster convert)
-- **Intelligent Caching** (v0.5.0): Avoid redundant API calls (50% reduction)
 - **Retry Logic**: Automatic retry with exponential backoff for network failures
+- **Progress Indicators**: Visual feedback for large operations (100+ variables)
+- **Network-bound**: Performance limited by 1Password API latency, not CPU
 
-**Benchmarks** (v0.5.0):
+**Typical Performance** (v0.3.0):
 
-| Variables | push  | sync  | diff  | Convert (refs) |
-|-----------|-------|-------|-------|----------------|
-| 10        | 2.0s  | 2.2s  | 2.0s  | 2.1s (5)       |
-| 50        | 3.0s  | 3.2s  | 2.9s  | 2.9s (10)      |
-| 100       | 4.2s  | 4.5s  | 4.1s  | 4.5s (20)      |
-| 500       | 8.2s  | 9.8s  | 8.7s  | 8.9s (50)      |
+| Variables | push  | inject |
+|-----------|-------|--------|
+| 10        | ~2s   | ~2s    |
+| 50        | ~3s   | ~3s    |
+| 100       | ~4s   | ~4s    |
+| 500       | ~8s   | ~8s    |
 
-**Key improvements in v0.5.0**:
-- Sync/diff: **22-24% faster** (parallel reads)
-- Convert: **34-68% faster** (bulk parallel resolution)
+**Future Optimizations** (planned v0.5.0):
+- Parallel read operations for sync/diff commands
+- Intelligent caching to reduce API calls
+- Bulk resolution for op:// references
 
-See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for detailed benchmarks and optimization strategies.
+See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for detailed information and optimization strategies.
 
 ## Comparison with Alternatives
 
@@ -811,15 +811,32 @@ Contributions welcome! Please:
 
 ## Roadmap
 
-- [ ] `init` command - Interactive vault setup wizard
-- [ ] `sync` command - Bidirectional sync with conflict resolution
+### Completed (v0.3.0)
+- ✅ `init` command - Interactive vault setup wizard
+- ✅ Progress indicators for large files
+- ✅ Global `--quiet` flag for CI/CD
+- ✅ Retry logic with exponential backoff
+- ✅ Multiline value support
+
+### Upcoming
+
+**v0.4.0** - Synchronization
 - [ ] `diff` command - Compare local .env with 1Password
+- [ ] `sync` command - Bidirectional sync with conflict resolution
+
+**v0.5.0** - Performance
+- [ ] Performance optimizations (parallel operations, caching)
+- [ ] Batch field operations optimization
+
+**v1.0.0** - Distribution
 - [ ] `rotate` command - Generate new secrets and update
 - [ ] Shell script installer (curl | bash)
 - [ ] Homebrew tap
 - [ ] Support for `.env.schema` validation
 - [ ] Docker image for CI/CD
 - [ ] GitHub Action
+
+See [ROADMAP.md](ROADMAP.md) for detailed information.
 
 ## License
 

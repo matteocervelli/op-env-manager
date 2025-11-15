@@ -23,7 +23,7 @@ source "$LIB_DIR/retry.sh"
 source "$LIB_DIR/progress.sh"
 
 # Version
-VERSION="0.1.0"
+VERSION="0.3.0"
 
 # Show main usage
 usage() {
@@ -42,7 +42,7 @@ COMMANDS:
     sync        Bidirectional sync between local .env and 1Password
     convert     Convert .env files with op:// references to op-env-manager format
     template    Generate .env.op template file with op:// references
-    init        Initialize 1Password vault structure (coming soon)
+    init        Interactive setup wizard for 1Password vault
     version     Show version information
     help        Show this help message
 

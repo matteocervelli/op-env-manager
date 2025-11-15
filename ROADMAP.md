@@ -2,7 +2,7 @@
 
 This document outlines the planned features, improvements, and long-term vision for op-env-manager.
 
-**Current Version**: 0.4.0
+**Current Version**: 0.3.0
 **Last Updated**: 2025-01-14
 
 ---
@@ -97,11 +97,11 @@ op-env-manager aims to be the simplest, most secure way to manage environment va
 ## Phase 3: Core Commands (Priority: MEDIUM)
 
 **Timeline**: 2-3 weeks
-**Status**: 🟢 In Progress (2/4 commands complete)
+**Status**: 🟢 In Progress (1/3 commands complete)
 
 ### 3.1 `init` Command - Interactive Setup Wizard
 
-**Status**: Placeholder exists, needs implementation
+**Status**: ✅ Complete (v0.3.0)
 
 **Functionality**:
 ```bash
@@ -122,16 +122,25 @@ op-env-manager init
 - Best practices by default
 
 **Implementation**:
-- [ ] Design interactive prompt flow
-- [ ] Implement vault creation/selection
-- [ ] Add multi-environment setup
-- [ ] Generate configuration file (`.op-env-manager.yml`?)
-- [ ] Write tests
-- [ ] Update documentation
+- ✅ Design interactive prompt flow
+- ✅ Implement vault creation/selection
+- ✅ Add multi-environment setup (separate items vs. sections)
+- ✅ Integration with push and template commands
+- ✅ Write tests (70+ unit tests, 30+ integration tests)
+- ✅ Update documentation
+
+**Features Delivered**:
+- ✅ Auto-detection of .env files in current directory
+- ✅ Vault creation support (with permissions check)
+- ✅ Smart item naming with sensible defaults
+- ✅ Multi-environment strategies (items vs. sections)
+- ✅ Dry-run mode support
+- ✅ Success summary with actionable next steps
+- ✅ Completes in <2 minutes for most setups
 
 ### 3.2 `diff` Command - Compare Local vs 1Password
 
-**Status**: ✅ Complete (v0.4.0)
+**Status**: 🟡 Planned (v0.4.0)
 
 **Functionality**:
 ```bash
@@ -150,18 +159,18 @@ op-env-manager diff --vault "Personal" --env .env
 - Preview inject/push operations
 
 **Implementation**:
-- ✅ Fetch fields from 1Password
-- ✅ Parse local .env file
-- ✅ Compare and categorize differences
-- ✅ Colorized diff output
-- ✅ Support for sections
-- ✅ Exit codes (0 = same, 1 = different)
-- ✅ Write tests (test_diff.bats with 30+ tests)
-- ✅ Update documentation
+- [ ] Fetch fields from 1Password
+- [ ] Parse local .env file
+- [ ] Compare and categorize differences
+- [ ] Colorized diff output
+- [ ] Support for sections
+- [ ] Exit codes (0 = same, 1 = different)
+- [ ] Write tests
+- [ ] Update documentation
 
 ### 3.3 `sync` Command - Bidirectional Synchronization
 
-**Status**: ✅ Complete (v0.4.0)
+**Status**: 🟡 Planned (v0.4.0)
 
 **Functionality**:
 ```bash
@@ -181,23 +190,14 @@ op-env-manager sync --vault "Personal" --env .env
 - Keeping environments in sync
 
 **Implementation**:
-- ✅ Implement diff logic (reuse from 3.2)
-- ✅ Design conflict resolution strategies (all 4 strategies implemented)
-- ✅ Interactive prompt for conflicts
-- ✅ Merge logic with three-way merge
-- ✅ Backup before sync (automatic timestamped backups)
-- ✅ State file management with SHA256 checksums
-- ✅ Write tests (test_sync.bats + test_sync_cycle.bats + test_sync_conflicts.bats with 60+ tests)
-- ✅ Update documentation
-
-**Features Delivered**:
-- ✅ Automatic backup creation (.op-env-manager/backups/)
-- ✅ State tracking (.op-env-manager.state with checksums)
-- ✅ Progress bars for large syncs (100+ variables)
-- ✅ Quiet mode support for CI/CD
-- ✅ Dry-run mode
-- ✅ Section support for multi-environment
-- ✅ Comprehensive error handling with suggestions
+- [ ] Implement diff logic (reuse from 3.2)
+- [ ] Design conflict resolution strategies
+- [ ] Interactive prompt for conflicts
+- [ ] Merge logic with three-way merge
+- [ ] Backup before sync
+- [ ] State file management
+- [ ] Write tests
+- [ ] Update documentation
 
 ### 3.4 `rotate` Command - Secret Rotation
 

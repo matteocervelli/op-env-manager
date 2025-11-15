@@ -2,6 +2,9 @@
 
 Performance characteristics, optimization strategies, and benchmarks for op-env-manager.
 
+**Current Version**: v0.3.0
+**Note**: Some optimizations mentioned below are planned for future releases (v0.5.0+)
+
 ## Table of Contents
 
 - [Performance Overview](#performance-overview)
@@ -68,7 +71,7 @@ op item edit "$item_title" --vault "$VAULT" "${field_args[@]}"
 
 ### 2. Parallel Read Operations
 
-**Status**: ✅ Implemented (v0.5.0)
+**Status**: 🔜 Planned (v0.5.0)
 
 **Description**: Local file parsing and remote 1Password fetching execute in parallel instead of sequentially.
 
@@ -106,7 +109,7 @@ wait $local_pid $remote_pid
 
 ### 3. Item Metadata Caching
 
-**Status**: ✅ Implemented (v0.5.0)
+**Status**: 🔜 Planned (v0.5.0)
 
 **Description**: Cache `op item get` results for the duration of a command execution to avoid redundant API calls.
 
@@ -149,7 +152,7 @@ check_item_exists_cached() {
 
 ### 4. Bulk op read Operations
 
-**Status**: ✅ Implemented (v0.5.0)
+**Status**: 🔜 Planned (v0.5.0)
 
 **Description**: Resolve multiple `op://` references in parallel instead of sequentially.
 
@@ -238,7 +241,7 @@ export OP_PROGRESS_THRESHOLD=100  # Default: 100 variables
 
 ## Benchmarks
 
-### Command Performance (v0.5.0)
+### Command Performance (v0.3.0)
 
 All benchmarks performed on:
 - **Network**: 50ms latency to 1Password servers
@@ -247,75 +250,81 @@ All benchmarks performed on:
 
 #### Push Command
 
-| Variables | v0.4.0 (Before) | v0.5.0 (After) | Improvement |
-|-----------|-----------------|----------------|-------------|
-| 10        | 2.1s            | 2.0s           | 5%          |
-| 50        | 3.2s            | 3.0s           | 6%          |
-| 100       | 4.5s            | 4.2s           | 7%          |
-| 500       | 8.8s            | 8.2s           | 7%          |
+| Variables | Time   | Notes                              |
+|-----------|--------|------------------------------------|
+| 10        | ~2.0s  | Batch operations already optimized |
+| 50        | ~3.0s  | Single API call for all fields     |
+| 100       | ~4.0s  | Progress bar auto-shows            |
+| 500       | ~8.0s  | Linear scaling                     |
 
-*Push command already optimized with batching (minimal gains from v0.5.0)*
+*Push command uses batch field operations (single API call)*
 
-#### Sync Command
+#### Inject Command
 
-| Variables | v0.4.0 (Before) | v0.5.0 (After) | Improvement |
-|-----------|-----------------|----------------|-------------|
-| 10        | 2.8s            | 2.2s           | **21%**     |
-| 50        | 4.1s            | 3.2s           | **22%**     |
-| 100       | 5.9s            | 4.5s           | **24%**     |
-| 500       | 12.5s           | 9.8s           | **22%**     |
-
-*Parallel reads provide significant improvement*
-
-#### Diff Command
-
-| Variables | v0.4.0 (Before) | v0.5.0 (After) | Improvement |
-|-----------|-----------------|----------------|-------------|
-| 10        | 2.6s            | 2.0s           | **23%**     |
-| 50        | 3.8s            | 2.9s           | **24%**     |
-| 100       | 5.4s            | 4.1s           | **24%**     |
-| 500       | 11.2s           | 8.7s           | **22%**     |
-
-*Parallel reads provide significant improvement*
+| Variables | Time   | Notes                           |
+|-----------|--------|---------------------------------|
+| 10        | ~2.0s  | Single API call to fetch fields |
+| 50        | ~3.0s  | Progress bar auto-shows         |
+| 100       | ~4.0s  | Linear scaling                  |
+| 500       | ~8.0s  | Network-bound                   |
 
 #### Convert Command
 
-| op:// Refs | v0.4.0 (Before) | v0.5.0 (After) | Improvement |
-|------------|-----------------|----------------|-------------|
-| 5          | 3.2s            | 2.1s           | **34%**     |
-| 10         | 5.8s            | 2.9s           | **50%**     |
-| 20         | 11.2s           | 4.5s           | **60%**     |
-| 50         | 27.5s           | 8.9s           | **68%**     |
+| op:// Refs | Time   | Notes                        |
+|------------|--------|------------------------------|
+| 5          | ~3.0s  | Sequential resolution        |
+| 10         | ~5.5s  | Each ref: ~500ms API call    |
+| 20         | ~11.0s | Linear scaling               |
+| 50         | ~27.0s | Optimization planned v0.5.0  |
 
-*Bulk parallel resolution provides dramatic improvement*
+*Sequential op read calls (bulk parallelization planned for v0.5.0)*
+
+#### Future Improvements (v0.5.0)
+
+Planned optimizations will improve:
+- **Sync/Diff**: 22-24% faster (parallel reads)
+- **Convert**: 34-68% faster (bulk parallel resolution)
 
 ---
 
 ### Scaling Characteristics
 
-#### Linear Scaling (Push/Sync/Diff)
+#### Linear Scaling (Push/Inject)
 
 ```
 Time = Base_Overhead + (Variables × Per_Variable_Cost)
 
 Where:
 - Base_Overhead ≈ 2 seconds (auth, network setup)
-- Per_Variable_Cost ≈ 0.012 seconds (after v0.5.0 optimizations)
+- Per_Variable_Cost ≈ 0.012 seconds (v0.3.0)
 ```
 
 **Example**:
 - 100 variables: 2 + (100 × 0.012) = **3.2 seconds**
 - 500 variables: 2 + (500 × 0.012) = **8 seconds**
 
-#### Sublinear Scaling (Convert with Parallel Bulk Resolution)
+**Note**: Sync/Diff commands will be added in v0.4.0 with improved scaling via parallel operations.
+
+#### Convert Command Scaling (v0.3.0)
+
+Currently uses sequential resolution:
 
 ```
-Time = Base_Overhead + (References / Parallelism × Per_Ref_Cost)
+Time = Base_Overhead + (References × Per_Ref_Cost)
 
 Where:
 - Base_Overhead ≈ 2 seconds
-- Parallelism ≈ 10-20 (OS-dependent)
-- Per_Ref_Cost ≈ 0.5 seconds (network-bound)
+- Per_Ref_Cost ≈ 0.5 seconds (sequential op read, network-bound)
+```
+
+**Example**:
+- 10 references: 2 + (10 × 0.5) = **7 seconds**
+- 50 references: 2 + (50 × 0.5) = **27 seconds**
+
+**v0.5.0 Improvement** (Planned): Parallel bulk resolution will use:
+```
+Time = Base_Overhead + (References / Parallelism × Per_Ref_Cost)
+Where Parallelism ≈ 10-20 (OS-dependent)
 ```
 
 **Example**:
