@@ -16,6 +16,10 @@
 
 set -eo pipefail
 
+# Prevent re-sourcing (avoid readonly variable redeclaration errors)
+[ -n "${_RETRY_SH_LOADED:-}" ] && return 0
+readonly _RETRY_SH_LOADED=1
+
 # Get script directory for sourcing dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

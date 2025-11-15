@@ -517,6 +517,8 @@ See: docs/1password-formats.md for detailed format comparison
 
 #### `template` - Generate op:// reference files
 
+**Enhanced in v0.3.1**: Now supports two modes - generate from 1Password (original) or merge with existing `.env.example` files (preserves comments/structure).
+
 Generate `.env.op` template files with `op://` secret references that can be safely committed to version control.
 
 ```bash
@@ -526,18 +528,32 @@ Options:
   --vault VAULT          1Password vault name (required)
   --item NAME            Item name (default: env-secrets)
   --section SECTION      Environment section (e.g., dev, prod)
+  --env-file FILE        Template file to merge with (e.g., .env.example) [NEW]
   --output FILE          Output file (default: .env.op)
   --dry-run              Preview without generating
 
-Examples:
+Mode 1: Generate from 1Password (default):
   # Generate template from existing 1Password item
   op-env-manager template --vault "Personal" --item "myapp"
 
   # Generate with section (uses $APP_ENV variable)
   op-env-manager template --vault "Projects" --item "myapp" --section "dev"
 
+Mode 2: Merge with existing file (NEW - preserves structure):
+  # Merge .env.example with 1Password references
+  op-env-manager template --vault "Personal" --item "myapp" --env-file ".env.example"
+
+  # With section for multi-environment
+  op-env-manager template --vault "Projects" --item "myapp" --section "dev" --env-file ".env.example"
+
   # Custom output filename
-  op-env-manager template --vault "Personal" --output ".env.template"
+  op-env-manager template --vault "Personal" --env-file ".env.example" --output ".env.production.op"
+
+Merge Mode Behavior (--env-file):
+  - Preserves all comments and structure from source file
+  - Variables in 1Password → replaced with op:// references
+  - Variables NOT in 1Password → kept as-is with WARNING comment
+  - Extra 1Password variables → appended at end with section comment
 
 Generated Format:
   # Without section:
@@ -547,6 +563,15 @@ Generated Format:
   # With section (dynamic):
   API_KEY=op://Personal/myapp/$APP_ENV/API_KEY
   DATABASE_URL=op://Personal/myapp/$APP_ENV/DATABASE_URL
+
+  # Merge mode example output:
+  # Application Settings
+  APP_NAME=op://Projects/myapp/$APP_ENV/APP_NAME
+  # WARNING: 'APP_VERSION' not found in 1Password - push this variable first
+  APP_VERSION=1.0.0
+
+  # Additional variables from 1Password (not in original template)
+  JWT_SECRET=op://Projects/myapp/$APP_ENV/JWT_SECRET
 
 Usage with op run:
   # Set APP_ENV to select section dynamically
