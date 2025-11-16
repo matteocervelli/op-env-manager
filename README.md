@@ -375,12 +375,14 @@ Options:
   --env-file FILE        Additional .env file to merge
   --template             Also save .env.op template file
   --template-output FILE Output path for template (default: .env.op)
+  --no-masking           Show unmasked secrets in command output
 
 Examples:
   op-env-manager run --vault "Production" -- docker compose up
   op-env-manager run --vault "Dev" --item "api" -- npm start
   op-env-manager run --vault "Staging" -- python manage.py migrate
   op-env-manager run --vault "Personal" --template -- npm start  # Also save .env.op
+  op-env-manager run --vault "Personal" --no-masking -- env      # Show full secret values
 ```
 
 #### `diff` - Compare local .env with 1Password

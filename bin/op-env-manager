@@ -62,6 +62,9 @@ EXAMPLES:
     # Run command with injected secrets
     op-env-manager run --vault="Personal" --item="myapp" --section="dev" -- docker compose up
 
+    # Run with unmasked secrets (show full values in output)
+    op-env-manager run --vault="Personal" --item="myapp" --no-masking -- env | grep API_KEY
+
     # Compare local .env with 1Password
     op-env-manager diff --vault="Personal" --env-file=.env
 
@@ -112,6 +115,7 @@ run_with_secrets() {
     local dry_run=false
     local save_template=false
     local template_output=".env.op"
+    local no_masking=false
 
     # Parse arguments until we hit --
     while [[ $# -gt 0 ]]; do
@@ -166,6 +170,10 @@ run_with_secrets() {
                 dry_run=true
                 shift
                 ;;
+            --no-masking)
+                no_masking=true
+                shift
+                ;;
             --)
                 shift
                 break
@@ -173,7 +181,7 @@ run_with_secrets() {
             *)
                 log_error "Unknown option for run command: $1"
                 echo ""
-                echo "Usage: op-env-manager run --vault=VAULT [--item=ITEM] [--section=SECTION] [--env-file=FILE] [--template] [--template-output=FILE] [--dry-run] -- <command>"
+                echo "Usage: op-env-manager run --vault=VAULT [--item=ITEM] [--section=SECTION] [--env-file=FILE] [--template] [--template-output=FILE] [--dry-run] [--no-masking] -- <command>"
                 exit 1
                 ;;
         esac
@@ -300,12 +308,20 @@ run_with_secrets() {
         log_step "Executing command with secrets..."
         echo ""
 
-        # Use op run to inject secrets
+        # Build op run command with optional flags
+        local op_run_args=()
+        op_run_args+=("--env-file=$temp_env")
+
         if [ -n "$env_file" ]; then
-            op run --env-file="$temp_env" --env-file="$env_file" -- "$@"
-        else
-            op run --env-file="$temp_env" -- "$@"
+            op_run_args+=("--env-file=$env_file")
         fi
+
+        if [ "$no_masking" = true ]; then
+            op_run_args+=("--no-masking")
+        fi
+
+        # Use op run to inject secrets
+        op run "${op_run_args[@]}" -- "$@"
     fi
 }
 
