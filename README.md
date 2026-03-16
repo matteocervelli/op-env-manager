@@ -19,8 +19,8 @@ by [Matteo Cervelli](https://github.com/matteocervelli)
 - **Push**: Upload your `.env` variables to 1Password for secure storage
 - **Inject**: Download secrets from 1Password into local `.env` files
 - **Run**: Execute commands with secrets injected from 1Password (no plaintext files!)
-- **Diff**: Compare local `.env` with 1Password to identify differences (planned v0.4.0)
-- **Sync**: Bidirectional synchronization with intelligent conflict resolution (planned v0.4.0)
+- **Diff**: Compare local `.env` with 1Password to identify differences (v0.3.1+)
+- **Sync**: Bidirectional synchronization with intelligent conflict resolution (v0.3.1+)
 - **Convert**: Migrate legacy `.env` files with `op://` references to op-env-manager format
 - **Template**: Generate `.env.op` files with `op://` references for version control
 
@@ -44,6 +44,7 @@ graph LR
 ```
 
 **How it works**:
+
 1. **Push**: Parse local `.env` → Create/update 1Password Secure Note with fields
 2. **Inject**: Fetch 1Password fields → Write to local `.env` (chmod 600)
 3. **Run**: Generate `op://` references → Execute with `op run` (no plaintext on disk)
@@ -52,12 +53,14 @@ graph LR
 ## Why?
 
 **The Problem**:
+
 - `.env` files contain sensitive secrets
 - Sharing them is insecure (email, Slack, git)
 - Keeping them in sync across team members is painful
 - Rotating secrets requires manual updates everywhere
 
 **The Solution**:
+
 - Store secrets in 1Password (encrypted, shared, versioned)
 - Push/pull on demand
 - Run applications with secrets injected at runtime
@@ -78,7 +81,7 @@ graph LR
 ✅ **Team Friendly** - Share vaults, control access
 ✅ **Git Safe** - Never commit secrets again
 ✅ **Auto-tagging** - All items tagged for easy filtering
-🔜 **Intelligent Sync** - Smart conflict resolution with diff/sync commands (planned v0.4.0)
+✅ **Diff & Sync** - Compare and bidirectionally sync with conflict resolution (v0.3.1+)
 🔜 **Performance Optimized** - Parallel operations, caching, bulk resolution (planned v0.5.0)
 
 ## Performance
@@ -92,14 +95,15 @@ op-env-manager is designed for speed and efficiency:
 
 **Typical Performance** (v0.3.0):
 
-| Variables | push  | inject |
-|-----------|-------|--------|
-| 10        | ~2s   | ~2s    |
-| 50        | ~3s   | ~3s    |
-| 100       | ~4s   | ~4s    |
-| 500       | ~8s   | ~8s    |
+| Variables | push | inject |
+| --------- | ---- | ------ |
+| 10        | ~2s  | ~2s    |
+| 50        | ~3s  | ~3s    |
+| 100       | ~4s  | ~4s    |
+| 500       | ~8s  | ~8s    |
 
 **Future Optimizations** (planned v0.5.0):
+
 - Parallel read operations for sync/diff commands
 - Intelligent caching to reduce API calls
 - Bulk resolution for op:// references
@@ -108,21 +112,22 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for detailed information and opti
 
 ## Comparison with Alternatives
 
-| Feature | op-env-manager | dotenv | envkey | AWS Secrets | HashiCorp Vault |
-|---------|---------------|--------|--------|-------------|-----------------|
-| **Cost** | Free (uses 1Password) | Free | Paid plans | AWS pricing | Self-hosted/paid |
-| **Setup Complexity** | Low (1Password CLI) | Very low | Medium | High | Very high |
-| **Team Sharing** | ✅ (1Password vaults) | ❌ (manual files) | ✅ | ✅ | ✅ |
-| **Access Control** | ✅ (1Password policies) | ❌ | ✅ | ✅ | ✅ |
-| **Audit Trail** | ✅ (1Password logs) | ❌ | ✅ | ✅ | ✅ |
-| **Runtime Injection** | ✅ (`run` command) | ❌ | ✅ | ❌ | ✅ |
-| **Multi-Environment** | ✅ (sections/vaults) | Manual files | ✅ | ✅ | ✅ |
-| **Git Safe** | ✅ (templates) | ⚠️ (gitignore) | ✅ | ✅ | ✅ |
-| **CI/CD Integration** | ✅ (Service Accounts) | ✅ | ✅ | ✅ | ✅ |
-| **Learning Curve** | Low | Very low | Medium | Medium | High |
-| **Infrastructure** | None (SaaS) | None | SaaS | AWS account | Self-hosted |
+| Feature               | op-env-manager          | dotenv            | envkey     | AWS Secrets | HashiCorp Vault  |
+| --------------------- | ----------------------- | ----------------- | ---------- | ----------- | ---------------- |
+| **Cost**              | Free (uses 1Password)   | Free              | Paid plans | AWS pricing | Self-hosted/paid |
+| **Setup Complexity**  | Low (1Password CLI)     | Very low          | Medium     | High        | Very high        |
+| **Team Sharing**      | ✅ (1Password vaults)   | ❌ (manual files) | ✅         | ✅          | ✅               |
+| **Access Control**    | ✅ (1Password policies) | ❌                | ✅         | ✅          | ✅               |
+| **Audit Trail**       | ✅ (1Password logs)     | ❌                | ✅         | ✅          | ✅               |
+| **Runtime Injection** | ✅ (`run` command)      | ❌                | ✅         | ❌          | ✅               |
+| **Multi-Environment** | ✅ (sections/vaults)    | Manual files      | ✅         | ✅          | ✅               |
+| **Git Safe**          | ✅ (templates)          | ⚠️ (gitignore)    | ✅         | ✅          | ✅               |
+| **CI/CD Integration** | ✅ (Service Accounts)   | ✅                | ✅         | ✅          | ✅               |
+| **Learning Curve**    | Low                     | Very low          | Medium     | Medium      | High             |
+| **Infrastructure**    | None (SaaS)             | None              | SaaS       | AWS account | Self-hosted      |
 
 **When to use op-env-manager**:
+
 - ✅ You already use 1Password for your team
 - ✅ You want simple, secure secret management without new infrastructure
 - ✅ You need team collaboration with access control
@@ -130,6 +135,7 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for detailed information and opti
 - ✅ You prefer CLI tools over web dashboards
 
 **When to use alternatives**:
+
 - **dotenv**: Solo projects, no team collaboration needed, very simple setup
 - **envkey**: Need dedicated secret management platform, willing to pay
 - **AWS Secrets Manager**: Already on AWS, want tight AWS integration
@@ -149,6 +155,7 @@ cd op-env-manager
 ```
 
 The installer will:
+
 1. Install to `~/.local/bin/op-env-manager/`
 2. Create symlink in `~/.local/bin/`
 3. Add to PATH (if needed)
@@ -171,6 +178,7 @@ source ~/.zshrc
 
 - **Bash** (4.0+)
 - **jq** - JSON processor
+
   ```bash
   # macOS
   brew install jq
@@ -179,6 +187,7 @@ source ~/.zshrc
   sudo apt install jq    # Debian/Ubuntu
   sudo dnf install jq    # Fedora/RHEL
   ```
+
 - **1Password CLI** - See [docs/1PASSWORD_SETUP.md](docs/1PASSWORD_SETUP.md)
 
 ## Quick Start
@@ -208,6 +217,7 @@ op-env-manager init
 ```
 
 The wizard will guide you through:
+
 - ✅ Vault selection or creation
 - ✅ Item naming
 - ✅ .env file detection
@@ -264,6 +274,7 @@ Available across all commands:
 - `-v, --version` - Show version information
 
 **Progress Indicators** (v0.3.0+):
+
 - Operations with 100+ variables automatically show ASCII progress bars: `[=====>     ] 45/150 (30%)`
 - Progress bars auto-detect terminal type (no output in pipes/redirects)
 - Auto-suppressed in CI/CD environments (detects `CI`, `GITHUB_ACTIONS`, etc.)
@@ -272,6 +283,7 @@ Available across all commands:
   - `OP_PROGRESS_THRESHOLD=100` - Customize threshold (default: 100 variables)
 
 **Examples:**
+
 ```bash
 # Quiet mode for scripts/CI
 op-env-manager --quiet push --vault "Production" --env .env.prod
@@ -598,6 +610,7 @@ Using --template flag:
 The tool supports multiline values for private keys, certificates, and JSON configurations.
 
 **Supported format:**
+
 ```bash
 # Single-line values (as before)
 API_KEY=simple_value
@@ -625,12 +638,14 @@ JSON_CONFIG="{
 ```
 
 **How it works:**
+
 - Multiline values must be enclosed in double quotes
 - When pushed to 1Password, newlines are converted to `\n` escape sequences
 - When injected back, escape sequences are converted to actual newlines
 - The injected `.env` file preserves the multiline format with quotes
 
 **Example usage:**
+
 ```bash
 # Push .env with multiline values
 op-env-manager push --vault "Personal" --env .env.production
@@ -647,6 +662,7 @@ op-env-manager run --vault "Personal" -- docker compose up
 ### Development Team Workflow
 
 **Setup (once per team member)**:
+
 ```bash
 # Team lead: Create shared vault and push secrets
 op-env-manager push --vault "MyApp-Dev" --env .env.development
@@ -656,12 +672,14 @@ op-env-manager inject --vault "MyApp-Dev" --output .env.local
 ```
 
 **Daily development**:
+
 ```bash
 # Run with fresh secrets from 1Password
 op-env-manager run --vault "MyApp-Dev" -- docker compose up
 ```
 
 **Update secrets**:
+
 ```bash
 # Update in 1Password UI or CLI
 # Team members automatically get updated secrets on next inject/run
@@ -718,6 +736,7 @@ op run --env-file=.env.template -- docker compose up
 ```
 
 **Why convert?**
+
 - Automated item management (no manual creation)
 - Bidirectional sync (push updates back)
 - Organized in single Secure Note per environment
@@ -838,8 +857,11 @@ Contributions welcome! Please:
 
 ## Roadmap
 
-### Completed (v0.3.0)
+### Completed (v0.3.x)
+
 - ✅ `init` command - Interactive vault setup wizard
+- ✅ `diff` command - Compare local .env with 1Password
+- ✅ `sync` command - Bidirectional sync with conflict resolution
 - ✅ Progress indicators for large files
 - ✅ Global `--quiet` flag for CI/CD
 - ✅ Retry logic with exponential backoff
@@ -847,15 +869,13 @@ Contributions welcome! Please:
 
 ### Upcoming
 
-**v0.4.0** - Synchronization
-- [ ] `diff` command - Compare local .env with 1Password
-- [ ] `sync` command - Bidirectional sync with conflict resolution
-
 **v0.5.0** - Performance
+
 - [ ] Performance optimizations (parallel operations, caching)
 - [ ] Batch field operations optimization
 
 **v1.0.0** - Distribution
+
 - [ ] `rotate` command - Generate new secrets and update
 - [ ] Shell script installer (curl | bash)
 - [ ] Homebrew tap
@@ -896,6 +916,7 @@ If `op-env-manager` saves you time and improves your team's security, consider s
 [![Buy Me A Coffee](https://img.shields.io/badge/☕-Buy%20me%20a%20coffee-orange.svg?style=for-the-badge)](https://adli.men/coffee)
 
 Your support helps me:
+
 - Maintain and improve this tool
 - Create more open-source developer tools
 - Write documentation and tutorials

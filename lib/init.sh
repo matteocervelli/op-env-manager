@@ -6,8 +6,11 @@ set -eo pipefail
 
 # Get script directory
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
 source "$LIB_DIR/logger.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/error_helpers.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/retry.sh"
 
 # Global variables
@@ -46,10 +49,10 @@ prompt_with_default() {
     local user_input
 
     if [[ -n "$default" ]]; then
-        read -p "$question [$default]: " user_input
+        read -rp "$question [$default]: " user_input
         echo "${user_input:-$default}"
     else
-        read -p "$question: " user_input
+        read -rp "$question: " user_input
         echo "$user_input"
     fi
 }
@@ -69,7 +72,7 @@ prompt_yes_no() {
         prompt_suffix="[y/N]"
     fi
 
-    read -p "$question $prompt_suffix: " user_input
+    read -rp "$question $prompt_suffix: " user_input
     user_input="${user_input:-$default}"
 
     if [[ "$user_input" =~ ^[Yy] ]]; then
@@ -286,7 +289,7 @@ prompt_multi_env_strategy() {
     echo ""
 
     local strategy
-    read -p "Choose strategy [i/s]: " strategy
+    read -rp "Choose strategy [i/s]: " strategy
 
     case "$strategy" in
         i|I)
@@ -340,6 +343,7 @@ execute_push() {
     fi
 
     # Source and call push command
+    # shellcheck source=/dev/null
     source "$push_cmd"
     push_env_to_1password "${args[@]}"
 }
@@ -370,6 +374,7 @@ generate_template() {
     fi
 
     # Source and call template command
+    # shellcheck source=/dev/null
     source "$template_cmd"
     generate_template_from_1password "${args[@]}"
 }

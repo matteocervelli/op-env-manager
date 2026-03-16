@@ -17,9 +17,13 @@ PROJECT_ROOT="$(cd "$INSTALL_DIR/.." && pwd)"
 LIB_DIR="$PROJECT_ROOT/lib"
 
 # Source utilities
+# shellcheck source=/dev/null
 source "$LIB_DIR/logger.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/error_helpers.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/retry.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/progress.sh"
 
 # Version
@@ -227,6 +231,7 @@ run_with_secrets() {
     echo ""
 
     # Source template generation functions
+    # shellcheck source=/dev/null
     source "$LIB_DIR/template.sh"
 
     # Create temporary .env file with secret references
@@ -327,6 +332,7 @@ run_with_secrets() {
 
 # Init command - Interactive setup wizard
 init_vault() {
+    # shellcheck source=/dev/null
     source "$LIB_DIR/init.sh"
     init_vault_wizard "$@"
 }
@@ -362,10 +368,12 @@ main() {
 
     case "$command" in
         push)
+            # shellcheck source=/dev/null
             source "$LIB_DIR/push.sh"
             main "$@"
             ;;
         inject)
+            # shellcheck source=/dev/null
             source "$LIB_DIR/inject.sh"
             main "$@"
             ;;
@@ -373,18 +381,22 @@ main() {
             run_with_secrets "$@"
             ;;
         diff)
+            # shellcheck source=/dev/null
             source "$LIB_DIR/diff.sh"
             main "$@"
             ;;
         sync)
+            # shellcheck source=/dev/null
             source "$LIB_DIR/sync.sh"
             main "$@"
             ;;
         convert)
+            # shellcheck source=/dev/null
             source "$LIB_DIR/convert.sh"
             main "$@"
             ;;
         template)
+            # shellcheck source=/dev/null
             source "$LIB_DIR/template.sh"
             main "$@"
             ;;

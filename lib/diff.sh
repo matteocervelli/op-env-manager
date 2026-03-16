@@ -6,14 +6,19 @@ set -eo pipefail
 
 # Get script directory
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
 source "$LIB_DIR/logger.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/error_helpers.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/retry.sh"
 
 # Import parse_env_file from push.sh
+# shellcheck source=/dev/null
 source "$LIB_DIR/push.sh"
 
 # Import get_fields_from_item from inject.sh
+# shellcheck source=/dev/null
 source "$LIB_DIR/inject.sh"
 
 # Global variables
@@ -233,17 +238,19 @@ compare_states() {
 # Display differences with colorized output
 display_diff() {
     local diff_json="$1"
+    # $2 (item_name) intentionally unused — kept for future use
+    # shellcheck disable=SC2034
     local item_name="$2"
 
-    # Parse diff JSON
-    local additions=$(echo "$diff_json" | jq -r '.additions[]' 2>/dev/null || true)
-    local deletions=$(echo "$diff_json" | jq -r '.deletions[]' 2>/dev/null || true)
-    local modifications=$(echo "$diff_json" | jq -r '.modifications[]' 2>/dev/null || true)
+    # Parse diff JSON (string variables holding newline-separated values)
+    local additions; additions=$(echo "$diff_json" | jq -r '.additions[]' 2>/dev/null || true)
+    local deletions; deletions=$(echo "$diff_json" | jq -r '.deletions[]' 2>/dev/null || true)
+    local modifications; modifications=$(echo "$diff_json" | jq -r '.modifications[]' 2>/dev/null || true)
 
     # Count differences
-    local add_count=$(echo "$additions" | grep -c "." || echo "0")
-    local del_count=$(echo "$deletions" | grep -c "." || echo "0")
-    local mod_count=$(echo "$modifications" | grep -c "." || echo "0")
+    local add_count; add_count=$(echo "$additions" | grep -c "." || echo "0")
+    local del_count; del_count=$(echo "$deletions" | grep -c "." || echo "0")
+    local mod_count; mod_count=$(echo "$modifications" | grep -c "." || echo "0")
     local total_diff=$((add_count + del_count + mod_count))
 
     if [ "$total_diff" -eq 0 ]; then
@@ -367,9 +374,9 @@ main() {
     log_step "Fetching data from local and remote sources (parallel)..."
 
     # Create temporary files for parallel operations
-    local local_temp=$(mktemp)
-    local remote_temp=$(mktemp)
-    local remote_status_temp=$(mktemp)
+    local local_temp; local_temp=$(mktemp)
+    local remote_temp; remote_temp=$(mktemp)
+    local remote_status_temp; remote_status_temp=$(mktemp)
 
     # Cleanup temps on exit
     trap 'rm -f "$local_temp" "$remote_temp" "$remote_status_temp"' EXIT
@@ -402,7 +409,7 @@ main() {
     wait $local_pid $remote_pid
 
     # Check remote status
-    local remote_status=$(cat "$remote_status_temp")
+    local remote_status; remote_status=$(cat "$remote_status_temp")
     if [ "$remote_status" != "0" ]; then
         log_error "Item not found: $item_title in vault $VAULT"
         echo "" >&2
@@ -413,14 +420,14 @@ main() {
     fi
 
     # Read results
-    local local_vars=$(cat "$local_temp")
-    local remote_vars=$(cat "$remote_temp")
+    local local_vars; local_vars=$(cat "$local_temp")
+    local remote_vars; remote_vars=$(cat "$remote_temp")
 
     # Display results
-    local local_count=$(echo "$local_vars" | grep -c "=" || echo "0")
+    local local_count; local_count=$(echo "$local_vars" | grep -c "=" || echo "0")
     log_success "Found $local_count variables in local file"
 
-    local remote_count=$(echo "$remote_vars" | grep -c "=" || echo "0")
+    local remote_count; remote_count=$(echo "$remote_vars" | grep -c "=" || echo "0")
     log_success "Found $remote_count variables in 1Password"
     echo ""
 

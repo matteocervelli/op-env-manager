@@ -6,14 +6,21 @@ set -eo pipefail
 
 # Get script directory
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
 source "$LIB_DIR/logger.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/error_helpers.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/retry.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/progress.sh"
 
 # Import functions from other commands
+# shellcheck source=/dev/null
 source "$LIB_DIR/push.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/inject.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/diff.sh"
 
 # Global variables
@@ -183,7 +190,7 @@ parse_args() {
     fi
 
     # Set state file path (same directory as env file)
-    local env_dir=$(dirname "$ENV_FILE")
+    local env_dir; env_dir=$(dirname "$ENV_FILE")
     STATE_FILE="$env_dir/.op-env-manager.state"
 }
 
@@ -228,7 +235,7 @@ save_sync_state() {
     local section="$4"
     local checksums_json="$5"  # JSON object with checksums
 
-    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local timestamp; timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
     # Build JSON manually (more portable than jq -n)
     cat > "$state_file" << EOF
@@ -254,15 +261,15 @@ build_checksums_json() {
 
     while IFS='=' read -r key value; do
         if [ -n "$key" ]; then
-            local checksum=$(compute_checksum "$value")
-            # Escape quotes in key for JSON
-            local escaped_key=$(echo "$key" | sed 's/"/\\"/g')
+            local checksum; checksum=$(compute_checksum "$value")
+            # Escape quotes in key for JSON using parameter expansion
+            local escaped_key="${key//\"/\\\"}"
             checksums_array+=("\"$escaped_key\": \"$checksum\"")
         fi
     done <<< "$vars"
 
     # Join with commas
-    local checksums_str=$(IFS=,; echo "${checksums_array[*]}")
+    local checksums_str; checksums_str=$(IFS=,; echo "${checksums_array[*]}")
 
     echo "{$checksums_str}"
 }
@@ -276,10 +283,10 @@ backup_env_file() {
         return 0
     fi
 
-    local env_dir=$(dirname "$env_file")
-    local env_basename=$(basename "$env_file")
+    local env_dir; env_dir=$(dirname "$env_file")
+    local env_basename; env_basename=$(basename "$env_file")
     local backup_dir="$env_dir/.op-env-manager/backups"
-    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local timestamp; timestamp=$(date +%Y%m%d_%H%M%S)
     local backup_file="$backup_dir/${env_basename}.${timestamp}.bak"
 
     mkdir -p "$backup_dir"
@@ -391,7 +398,7 @@ merge_and_write() {
     while IFS='=' read -r key value; do
         if [ -n "$key" ]; then
             # Handle multiline values (convert \n back to actual newlines)
-            local processed_value=$(printf '%b' "$value")
+            local processed_value; processed_value=$(printf '%b' "$value")
 
             # Wrap in quotes if contains newlines, spaces, or special chars
             if [[ "$processed_value" == *$'\n'* ]] || [[ "$processed_value" == *" "* ]]; then
@@ -431,7 +438,7 @@ push_to_1password() {
     while IFS='=' read -r key value; do
         if [ -n "$key" ]; then
             # Escape special characters in value
-            local escaped_value=$(echo "$value" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
+            local escaped_value; escaped_value=$(echo "$value" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
 
             # Build field reference
             if [ -n "$section" ]; then
@@ -514,10 +521,8 @@ main() {
 
     # Load last sync state
     log_step "Loading sync state..."
-    local state_json=$(load_sync_state "$STATE_FILE")
-    local has_previous_sync=false
+    local state_json; state_json=$(load_sync_state "$STATE_FILE")
     if [ "$(echo "$state_json" | jq -r '.version // empty')" != "" ]; then
-        has_previous_sync=true
         log_info "Found previous sync: $(echo "$state_json" | jq -r '.last_sync')"
     else
         log_info "No previous sync found (first sync)"
@@ -528,10 +533,10 @@ main() {
     log_step "Fetching data from local and remote sources (parallel)..."
 
     # Create temporary files for parallel operations
-    local local_temp=$(mktemp)
-    local remote_temp=$(mktemp)
-    local local_error_temp=$(mktemp)
-    local remote_error_temp=$(mktemp)
+    local local_temp; local_temp=$(mktemp)
+    local remote_temp; remote_temp=$(mktemp)
+    local local_error_temp; local_error_temp=$(mktemp)
+    local remote_error_temp; remote_error_temp=$(mktemp)
 
     # Cleanup temps on exit
     trap 'rm -f "$local_temp" "$remote_temp" "$local_error_temp" "$remote_error_temp"' EXIT
@@ -567,20 +572,19 @@ main() {
     wait $local_pid $remote_pid
 
     # Read results
-    local local_vars=$(cat "$local_temp")
-    local remote_vars=$(cat "$remote_temp")
-    local local_error=$(cat "$local_error_temp")
-    local remote_error=$(cat "$remote_error_temp")
+    local local_vars; local_vars=$(cat "$local_temp")
+    local remote_vars; remote_vars=$(cat "$remote_temp")
+    local local_error; local_error=$(cat "$local_error_temp")
 
     # Display results
-    local local_count=$(echo "$local_vars" | grep -c "=" || echo "0")
+    local local_count; local_count=$(echo "$local_vars" | grep -c "=" || echo "0")
     log_success "Found $local_count variables in local file"
 
     if [ -n "$local_error" ] && [ "$local_count" -eq 0 ]; then
         log_warning "$local_error"
     fi
 
-    local remote_count=$(echo "$remote_vars" | grep -c "=" || echo "0")
+    local remote_count; remote_count=$(echo "$remote_vars" | grep -c "=" || echo "0")
     if [ "$remote_count" -gt 0 ]; then
         log_success "Found $remote_count variables in 1Password"
     else
@@ -593,13 +597,13 @@ main() {
     local diff_json
     diff_json=$(compare_states "$local_vars" "$remote_vars")
 
-    local additions=$(echo "$diff_json" | jq -r '.additions[]' 2>/dev/null || true)
-    local deletions=$(echo "$diff_json" | jq -r '.deletions[]' 2>/dev/null || true)
-    local modifications=$(echo "$diff_json" | jq -r '.modifications[]' 2>/dev/null || true)
+    local additions; additions=$(echo "$diff_json" | jq -r '.additions[]' 2>/dev/null || true)
+    local deletions; deletions=$(echo "$diff_json" | jq -r '.deletions[]' 2>/dev/null || true)
+    local modifications; modifications=$(echo "$diff_json" | jq -r '.modifications[]' 2>/dev/null || true)
 
-    local add_count=$(echo "$additions" | grep -c "." || echo "0")
-    local del_count=$(echo "$deletions" | grep -c "." || echo "0")
-    local mod_count=$(echo "$modifications" | grep -c "." || echo "0")
+    local add_count; add_count=$(echo "$additions" | grep -c "." || echo "0")
+    local del_count; del_count=$(echo "$deletions" | grep -c "." || echo "0")
+    local mod_count; mod_count=$(echo "$modifications" | grep -c "." || echo "0")
     local total_changes=$((add_count + del_count + mod_count))
 
     log_success "Found $total_changes changes ($add_count additions, $del_count deletions, $mod_count modifications)"
@@ -651,7 +655,7 @@ main() {
         log_info "Removing (only in local):"
         while IFS= read -r key; do
             if [ -n "$key" ]; then
-                unset merged_map["$key"]
+                unset "merged_map[$key]"
                 log_success "  - $key"
             fi
         done <<< "$deletions"
@@ -714,7 +718,7 @@ main() {
 
     # Save sync state
     log_step "Saving sync state..."
-    local checksums_json=$(build_checksums_json "$merged_vars")
+    local checksums_json; checksums_json=$(build_checksums_json "$merged_vars")
     save_sync_state "$STATE_FILE" "$VAULT" "$ITEM_NAME" "$SECTION" "$checksums_json"
     echo ""
 

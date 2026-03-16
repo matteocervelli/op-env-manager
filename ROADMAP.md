@@ -2,8 +2,8 @@
 
 This document outlines the planned features, improvements, and long-term vision for op-env-manager.
 
-**Current Version**: 0.3.0
-**Last Updated**: 2025-01-14
+**Current Version**: 0.3.1
+**Last Updated**: 2026-03-16
 
 ---
 
@@ -20,9 +20,10 @@ op-env-manager aims to be the simplest, most secure way to manage environment va
 ## Phase 1: Stability & Testing (Priority: HIGH)
 
 **Timeline**: 1-2 weeks
-**Status**: 🟡 Planned
+**Status**: ✅ Complete
 
 ### Goals
+
 - Establish automated test suite
 - Improve reliability and error handling
 - Performance optimization
@@ -30,35 +31,39 @@ op-env-manager aims to be the simplest, most secure way to manage environment va
 ### Tasks
 
 #### 1.1 Automated Testing
-- [ ] Install and configure bats (Bash Automated Testing System)
-- [ ] Create test suite structure (`tests/` directory)
-- [ ] Write unit tests:
-  - [ ] .env parsing with various formats (quotes, comments, spaces)
-  - [ ] op:// reference extraction (embedded in URLs, etc.)
-  - [ ] Template generation logic
-  - [ ] Error handling paths
-- [ ] Write integration tests:
-  - [ ] Push/inject cycle with test vault
-  - [ ] Convert command end-to-end
-  - [ ] Multi-environment scenarios
-  - [ ] Section handling
+
+- ✅ Install and configure bats (Bash Automated Testing System)
+- ✅ Create test suite structure (`tests/` directory)
+- ✅ Write unit tests:
+  - ✅ .env parsing with various formats (quotes, comments, spaces)
+  - ✅ op:// reference extraction (embedded in URLs, etc.)
+  - ✅ Template generation logic
+  - ✅ Error handling paths
+- ✅ Write integration tests:
+  - ✅ Push/inject cycle with test vault
+  - ✅ Convert command end-to-end
+  - ✅ Multi-environment scenarios
+  - ✅ Section handling
 - [ ] Set up GitHub Actions CI/CD pipeline:
   - [ ] Run tests on push
   - [ ] Test on multiple platforms (Ubuntu, macOS)
   - [ ] Coverage reporting
 
 #### 1.2 Bug Fixes and Edge Cases
-- [ ] Multiline .env value support
-- [ ] Better error messages with actionable next steps
-- [ ] Retry logic for network errors (1Password API timeouts)
-- [ ] Handle special characters in variable names/values
+
+- ✅ Multiline .env value support
+- ✅ Better error messages with actionable next steps
+- ✅ Retry logic for network errors (1Password API timeouts)
+- ✅ Handle special characters in variable names/values
 
 #### 1.3 Performance Improvements
-- [ ] Optimize batch field operations in push command
-- [ ] Add progress indicators for large files (100+ variables)
-- [ ] Benchmark and document performance characteristics
+
+- ✅ Optimize batch field operations in push command
+- ✅ Add progress indicators for large files (100+ variables)
+- ✅ Benchmark and document performance characteristics
 
 **Success Criteria**:
+
 - ✅ 80%+ test coverage
 - ✅ All tests passing in CI/CD
 - ✅ Performance benchmarks documented
@@ -73,21 +78,25 @@ op-env-manager aims to be the simplest, most secure way to manage environment va
 ### Completed
 
 #### 2.1 Core Documentation
+
 - ✅ Enhanced CLAUDE.md with Testing, Debugging, Performance sections
 - ✅ Updated README.md with architecture diagram and comparison table
 - ✅ Added support/coffee link integration
 
 #### 2.2 Advanced Guides
+
 - ✅ CI/CD Examples (GitHub Actions, GitLab CI, Jenkins)
 - ✅ Team Collaboration best practices
 - ✅ Architecture Decision Records (ADRs)
 
 #### 2.3 Content Marketing (Local)
+
 - ✅ Blog post outlines (5 articles)
 - ✅ Video scripts (4 videos)
 - ✅ Social media content calendar
 
 **Next Steps**:
+
 - [ ] Create video tutorials
 - [ ] Publish blog posts
 - [ ] Launch social media presence
@@ -97,18 +106,20 @@ op-env-manager aims to be the simplest, most secure way to manage environment va
 ## Phase 3: Core Commands (Priority: MEDIUM)
 
 **Timeline**: 2-3 weeks
-**Status**: 🟢 In Progress (1/3 commands complete)
+**Status**: ✅ Complete (3/3 commands complete)
 
 ### 3.1 `init` Command - Interactive Setup Wizard
 
 **Status**: ✅ Complete (v0.3.0)
 
 **Functionality**:
+
 ```bash
 op-env-manager init
 ```
 
 **Interactive prompts**:
+
 - Vault selection or creation
 - Item naming
 - Environment configuration (dev/staging/prod)
@@ -117,11 +128,13 @@ op-env-manager init
 - Git configuration
 
 **Benefits**:
+
 - Zero to working in 2 minutes
 - Guided onboarding for new users
 - Best practices by default
 
 **Implementation**:
+
 - ✅ Design interactive prompt flow
 - ✅ Implement vault creation/selection
 - ✅ Add multi-environment setup (separate items vs. sections)
@@ -130,6 +143,7 @@ op-env-manager init
 - ✅ Update documentation
 
 **Features Delivered**:
+
 - ✅ Auto-detection of .env files in current directory
 - ✅ Vault creation support (with permissions check)
 - ✅ Smart item naming with sensible defaults
@@ -140,9 +154,10 @@ op-env-manager init
 
 ### 3.2 `diff` Command - Compare Local vs 1Password
 
-**Status**: 🟡 Planned (v0.4.0)
+**Status**: ✅ Complete (v0.3.1)
 
 **Functionality**:
+
 ```bash
 # Compare local .env with 1Password
 op-env-manager diff --vault "Personal" --env .env
@@ -154,25 +169,28 @@ op-env-manager diff --vault "Personal" --env .env
 ```
 
 **Use Cases**:
+
 - Detect secret drift
 - Verify synchronization
 - Preview inject/push operations
 
 **Implementation**:
-- [ ] Fetch fields from 1Password
-- [ ] Parse local .env file
-- [ ] Compare and categorize differences
-- [ ] Colorized diff output
-- [ ] Support for sections
-- [ ] Exit codes (0 = same, 1 = different)
-- [ ] Write tests
-- [ ] Update documentation
+
+- ✅ Fetch fields from 1Password
+- ✅ Parse local .env file
+- ✅ Compare and categorize differences
+- ✅ Colorized diff output
+- ✅ Support for sections
+- ✅ Exit codes (0 = same, 1 = different)
+- ✅ Write tests
+- ✅ Update documentation
 
 ### 3.3 `sync` Command - Bidirectional Synchronization
 
-**Status**: 🟡 Planned (v0.4.0)
+**Status**: ✅ Complete (v0.3.1)
 
 **Functionality**:
+
 ```bash
 # Interactive sync with conflict resolution
 op-env-manager sync --vault "Personal" --env .env
@@ -185,23 +203,26 @@ op-env-manager sync --vault "Personal" --env .env
 ```
 
 **Use Cases**:
+
 - Team collaboration
 - Multi-machine development
 - Keeping environments in sync
 
 **Implementation**:
-- [ ] Implement diff logic (reuse from 3.2)
-- [ ] Design conflict resolution strategies
-- [ ] Interactive prompt for conflicts
-- [ ] Merge logic with three-way merge
-- [ ] Backup before sync
-- [ ] State file management
-- [ ] Write tests
-- [ ] Update documentation
+
+- ✅ Implement diff logic (reuse from 3.2)
+- ✅ Design conflict resolution strategies
+- ✅ Interactive prompt for conflicts
+- ✅ Merge logic with three-way merge
+- ✅ Backup before sync
+- ✅ State file management
+- ✅ Write tests
+- ✅ Update documentation
 
 ### 3.4 `rotate` Command - Secret Rotation
 
 **Functionality**:
+
 ```bash
 # Rotate specific secret
 op-env-manager rotate --vault "Personal" --key "API_KEY"
@@ -210,11 +231,13 @@ op-env-manager rotate --vault "Personal" --key "API_KEY"
 ```
 
 **Use Cases**:
+
 - Quarterly secret rotation
 - Compromised secret response
 - Compliance requirements
 
 **Implementation**:
+
 - [ ] Secret generation (configurable complexity)
 - [ ] Update in 1Password
 - [ ] Optional deployment hook
@@ -236,6 +259,7 @@ op-env-manager rotate --vault "Personal" --key "API_KEY"
 **Goal**: `brew install matteocervelli/tap/op-env-manager`
 
 **Tasks**:
+
 - [ ] Create Homebrew formula
 - [ ] Set up tap repository (`homebrew-tap`)
 - [ ] Automate release process (GitHub Actions)
@@ -243,6 +267,7 @@ op-env-manager rotate --vault "Personal" --key "API_KEY"
 - [ ] Document installation in README
 
 **Benefits**:
+
 - Native macOS installation
 - Automatic updates via brew
 - Familiar developer workflow
@@ -252,6 +277,7 @@ op-env-manager rotate --vault "Personal" --key "API_KEY"
 **Goal**: `curl -sSL https://op-env-manager.sh | bash`
 
 **Tasks**:
+
 - [ ] Create installation script
 - [ ] Host on GitHub Pages or CDN
 - [ ] Support Linux and macOS
@@ -259,6 +285,7 @@ op-env-manager rotate --vault "Personal" --key "API_KEY"
 - [ ] Update documentation
 
 **Benefits**:
+
 - One-line installation
 - Works on any Unix-like system
 - CI/CD friendly
@@ -268,11 +295,13 @@ op-env-manager rotate --vault "Personal" --key "API_KEY"
 **Goal**: `docker run --rm -it op-env-manager [command]`
 
 **Use Cases**:
+
 - CI/CD pipelines without 1Password CLI installation
 - Isolated execution
 - Version pinning
 
 **Tasks**:
+
 - [ ] Create Dockerfile (multi-stage build)
 - [ ] Push to Docker Hub / GitHub Container Registry
 - [ ] Automate builds on release
@@ -292,6 +321,7 @@ op-env-manager rotate --vault "Personal" --key "API_KEY"
 ```
 
 **Tasks**:
+
 - [ ] Create GitHub Action wrapper
 - [ ] Publish to GitHub Marketplace
 - [ ] Add comprehensive examples
@@ -307,6 +337,7 @@ op-env-manager rotate --vault "Personal" --key "API_KEY"
 ### 5.1 `.env.schema` Validation
 
 **Functionality**:
+
 ```bash
 # Define required variables and types
 cat .env.schema
@@ -319,6 +350,7 @@ op-env-manager push --validate
 ```
 
 **Benefits**:
+
 - Catch missing variables early
 - Type checking
 - Documentation in code
@@ -326,6 +358,7 @@ op-env-manager push --validate
 ### 5.2 Multi-Vault Injection
 
 **Functionality**:
+
 ```bash
 # Merge secrets from multiple vaults
 op-env-manager inject \
@@ -335,6 +368,7 @@ op-env-manager inject \
 ```
 
 **Use Cases**:
+
 - Shared credentials (database, cache)
 - Project-specific secrets
 - Microservices architecture
@@ -342,11 +376,13 @@ op-env-manager inject \
 ### 5.3 Secret Expiration Tracking
 
 **Functionality**:
+
 - Set expiration dates on secrets
 - Warning notifications before expiration
 - Automated rotation reminders
 
 **Integration**:
+
 - Use 1Password item metadata
 - CLI warnings
 - Optional webhook notifications
@@ -354,11 +390,13 @@ op-env-manager inject \
 ### 5.4 Audit Logging
 
 **Functionality**:
+
 - Local audit log of all operations
 - Who accessed what, when
 - Export to SIEM/logging systems
 
 **Use Cases**:
+
 - Compliance (SOC2, ISO 27001)
 - Security monitoring
 - Incident investigation
@@ -368,6 +406,7 @@ op-env-manager inject \
 **Goal**: Native IDE integration
 
 **Features**:
+
 - Inject secrets from command palette
 - View available vaults/items
 - Push changes on save
@@ -378,6 +417,7 @@ op-env-manager inject \
 **Goal**: User-friendly interface for non-CLI users
 
 **Options**:
+
 - Terminal UI (using `gum` or similar)
 - Electron-based GUI
 - Web dashboard (local server)
@@ -387,6 +427,7 @@ op-env-manager inject \
 ## Version Milestones
 
 ### v0.2.0 - Stability Release
+
 **Target**: Q1 2025
 
 - ✅ Automated test suite (80%+ coverage)
@@ -394,41 +435,47 @@ op-env-manager inject \
 - ✅ Performance optimizations
 - ✅ Bug fixes and edge cases
 
-### v0.3.0 - Core Commands Release
-**Target**: Q2 2025
+### v0.3.0 - Core Commands Release ✅
 
-- ✅ `init` command (interactive setup)
+**Released**: January 2025
+
+- ✅ `init` command (interactive setup wizard)
 - ✅ `diff` command (compare local vs 1Password)
+- ✅ `sync` command (bidirectional sync with conflict resolution)
 - ✅ Improved documentation
 
 ### v0.4.0 - Distribution Release
-**Target**: Q2 2025
 
-- ✅ Homebrew tap
-- ✅ Shell installer (curl | bash)
-- ✅ Docker image
-- ✅ GitHub Action
+**Target**: Q2 2026
+
+- [ ] Homebrew tap
+- [ ] Shell installer (curl | bash)
+- [ ] Docker image
+- [ ] GitHub Action
 
 ### v0.5.0 - Advanced Commands Release
-**Target**: Q3 2025
 
-- ✅ `sync` command (bidirectional sync)
-- ✅ `rotate` command (secret rotation)
+**Target**: Q3 2026
+
+- [ ] `rotate` command (secret rotation)
+- [ ] Performance optimizations (parallel operations, caching)
 
 ### v1.0.0 - Stable Release
-**Target**: Q4 2025
 
-- ✅ All core features complete
-- ✅ Comprehensive test coverage
-- ✅ Production-ready for enterprise
-- ✅ `.env.schema` validation
-- ✅ Multi-vault support
+**Target**: Q4 2026
+
+- [ ] All core features complete
+- [ ] Comprehensive test coverage
+- [ ] Production-ready for enterprise
+- [ ] `.env.schema` validation
+- [ ] Multi-vault support
 
 ---
 
 ## Community & Ecosystem
 
 ### Short-term
+
 - [ ] Set up GitHub Discussions
 - [ ] Create contribution guidelines
 - [ ] Add issue templates (already done ✅)
@@ -436,6 +483,7 @@ op-env-manager inject \
 - [ ] Weekly office hours (if community grows)
 
 ### Long-term
+
 - [ ] Plugin system for custom commands
 - [ ] Third-party integrations (Terraform, Ansible, etc.)
 - [ ] Conference talks and workshops
@@ -461,21 +509,25 @@ Things we explicitly **won't** do:
 Want to help? Here's how:
 
 ### 1. Use it and provide feedback
+
 - Open issues for bugs
 - Request features via Discussions
 - Share your use cases
 
 ### 2. Contribute code
+
 - Pick an issue labeled `good first issue`
 - Implement roadmap items
 - Improve documentation
 
 ### 3. Spread the word
+
 - Star the repository
 - Write blog posts about your experience
 - Share on social media
 
 ### 4. Financial support
+
 Support development: [☕ Buy me a coffee](https://adli.men/coffee)
 
 ---
@@ -490,4 +542,4 @@ Support development: [☕ Buy me a coffee](https://adli.men/coffee)
 
 **Note**: This roadmap is aspirational and subject to change based on community feedback, adoption, and available development time. Priorities may shift as we learn from real-world usage.
 
-*Last updated: 2024-12*
+_Last updated: 2026-03-16_

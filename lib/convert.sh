@@ -6,8 +6,11 @@ set -eo pipefail
 
 # Get script directory
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
 source "$LIB_DIR/logger.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/error_helpers.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/retry.sh"
 
 # Global variables
@@ -227,7 +230,7 @@ bulk_resolve_op_references() {
     fi
 
     # Count references for progress
-    local ref_count=$(echo "$refs_input" | wc -l | tr -d ' ')
+    local ref_count; ref_count=$(echo "$refs_input" | wc -l | tr -d ' ')
 
     if [ "$DRY_RUN" = true ]; then
         # In dry-run, just echo mock resolutions
@@ -240,7 +243,7 @@ bulk_resolve_op_references() {
     log_info "Resolving $ref_count op:// references in parallel..." >&2
 
     # Create temporary directory for parallel results
-    local temp_dir=$(mktemp -d)
+    local temp_dir; temp_dir=$(mktemp -d)
     trap 'rm -rf "$temp_dir"' EXIT
 
     # Start parallel resolution jobs
@@ -251,8 +254,7 @@ bulk_resolve_op_references() {
         {
             local result_file="$temp_dir/result_${job_id}"
             local value
-            value=$(retry_with_backoff "resolve secret reference" op read "$ref" 2>&1)
-            if [ $? -eq 0 ]; then
+            if value=$(retry_with_backoff "resolve secret reference" op read "$ref" 2>&1); then
                 echo "$key|$value" > "$result_file"
             else
                 echo "$key|ERROR:$value" > "$result_file"
@@ -503,8 +505,7 @@ convert_to_1password() {
         local result
         if [ "$item_exists" = true ]; then
             # Update existing item
-            result=$(retry_with_backoff "update item with fields" op item edit "$item_title" --vault "$VAULT" "${field_args[@]}" 2>&1)
-            if [ $? -ne 0 ]; then
+            if ! result=$(retry_with_backoff "update item with fields" op item edit "$item_title" --vault "$VAULT" "${field_args[@]}" 2>&1); then
                 echo ""
                 log_error "Failed to update item in 1Password"
                 echo "$result"
@@ -513,12 +514,11 @@ convert_to_1password() {
         else
             # Create new item
             log_info "Creating item..."
-            result=$(retry_with_backoff "create new item" op item create --category="Secure Note" \
+            if ! result=$(retry_with_backoff "create new item" op item create --category="Secure Note" \
                 --title="$item_title" \
                 --vault="$VAULT" \
                 --tags="op-env-manager" \
-                "${field_args[0]}" < /dev/null 2>&1)
-            if [ $? -ne 0 ]; then
+                "${field_args[0]}" < /dev/null 2>&1); then
                 echo ""
                 log_error "Failed to create item in 1Password"
                 echo "$result"
@@ -529,8 +529,7 @@ convert_to_1password() {
             if [ ${#field_args[@]} -gt 1 ]; then
                 log_info "Adding remaining fields..."
                 local remaining_fields=("${field_args[@]:1}")
-                result=$(retry_with_backoff "add remaining fields" op item edit "$item_title" --vault "$VAULT" "${remaining_fields[@]}" 2>&1)
-                if [ $? -ne 0 ]; then
+                if ! result=$(retry_with_backoff "add remaining fields" op item edit "$item_title" --vault "$VAULT" "${remaining_fields[@]}" 2>&1); then
                     echo ""
                     log_error "Failed to add remaining fields to item"
                     echo "$result"
@@ -556,6 +555,7 @@ convert_to_1password() {
             log_step "Generating template file: $TEMPLATE_OUTPUT"
 
             # Source template generation functions
+            # shellcheck source=/dev/null
             source "$LIB_DIR/template.sh"
 
             # Collect field names from converted variables
