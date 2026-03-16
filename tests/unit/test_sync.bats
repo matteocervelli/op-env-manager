@@ -8,6 +8,13 @@ load ../test_helper/common
 # Test Setup and Teardown
 # =============================================================================
 
+setup_file() {
+    # sync.sh uses declare -A (associative arrays) which requires Bash 4+
+    if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+        skip "Requires Bash 4+ for associative arrays (running Bash ${BASH_VERSION})"
+    fi
+}
+
 setup() {
     verify_test_environment
     setup_temp_dir

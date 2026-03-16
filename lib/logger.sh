@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 # Check if output should be suppressed (quiet mode)
 is_quiet_mode() {
-    [[ "${OP_QUIET_MODE}" == "true" ]]
+    [[ "${OP_QUIET_MODE:-}" == "true" ]]
 }
 
 # Log levels
