@@ -218,6 +218,13 @@ archive/
 old/
 deprecated/
 
+# Auto-generated test fixture files (created by performance tests)
+10
+50
+100
+large-test-*.env
+test-large-*.env
+
 # Content drafts and marketing materials (local only)
 content/
 
