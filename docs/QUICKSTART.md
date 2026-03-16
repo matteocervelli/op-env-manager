@@ -17,47 +17,115 @@ cd op-env-manager && ./install.sh
 
 ## Common Commands
 
+### Interactive setup (first time)
+
+```bash
+# Guided wizard: detects .env files, configures vault, pushes secrets
+op-env-manager init
+```
+
 ### Push .env to 1Password
 
 ```bash
 # Push to Personal vault
-op-env-manager push --vault "Personal" --env .env
+op-env-manager push --vault="Personal" --env-file=.env
 
 # Push to custom vault with custom item name
-op-env-manager push --vault "MyApp-Production" --env .env.prod --item "api-secrets"
+op-env-manager push --vault="MyApp-Production" --env-file=.env.prod --item="api-secrets"
+
+# Push with environment section (enables op://vault/item/$APP_ENV/KEY references)
+op-env-manager push --vault="Projects" --item="myapp" --section="dev" --env-file=.env.dev
+
+# Push and also generate a .env.op template file
+op-env-manager push --vault="Personal" --env-file=.env --template
 
 # Dry run (preview only)
-op-env-manager push --vault "Personal" --env .env --dry-run
+op-env-manager push --vault="Personal" --env-file=.env --dry-run
 ```
 
 ### Inject secrets from 1Password
 
 ```bash
 # Inject to .env.local
-op-env-manager inject --vault "Personal" --output .env.local
+op-env-manager inject --vault="Personal" --output=.env.local
 
 # Inject from custom item
-op-env-manager inject --vault "MyApp-Production" --item "api-secrets" --output .env.prod
+op-env-manager inject --vault="MyApp-Production" --item="api-secrets" --output=.env.prod
+
+# Inject a specific environment section
+op-env-manager inject --vault="Projects" --item="myapp" --section="prod" --output=.env.prod
 
 # Overwrite without prompting
-op-env-manager inject --vault "Personal" --overwrite
+op-env-manager inject --vault="Personal" --overwrite
 
 # Dry run (preview only)
-op-env-manager inject --vault "Personal" --dry-run
+op-env-manager inject --vault="Personal" --dry-run
 ```
 
 ### Run commands with secrets
 
 ```bash
 # Run docker compose
-op-env-manager run --vault "Production" -- docker compose up
+op-env-manager run --vault="Production" -- docker compose up
 
 # Run with custom item
-op-env-manager run --vault "Production" --item "api-secrets" -- docker compose up
+op-env-manager run --vault="Production" --item="api-secrets" -- docker compose up
+
+# Run with environment section
+op-env-manager run --vault="Projects" --item="myapp" --section="dev" -- npm run dev
+
+# Run with unmasked secrets (shows full values in output — use carefully)
+op-env-manager run --vault="Dev" --item="myapp" --no-masking -- env | grep API_KEY
 
 # Run any command
-op-env-manager run --vault "Dev" -- npm run dev
-op-env-manager run --vault "Production" -- python manage.py migrate
+op-env-manager run --vault="Dev" -- npm run dev
+op-env-manager run --vault="Production" -- python manage.py migrate
+```
+
+### Compare local .env with 1Password
+
+```bash
+# Show differences between local file and vault
+op-env-manager diff --vault="Personal" --env-file=.env
+
+# Diff a specific section
+op-env-manager diff --vault="Projects" --item="myapp" --section="dev" --env-file=.env.dev
+```
+
+### Sync local .env with 1Password (bidirectional)
+
+```bash
+# Interactive sync (prompts on conflicts)
+op-env-manager sync --vault="Personal" --env-file=.env
+
+# Automatic: prefer local values on conflict
+op-env-manager sync --vault="Projects" --item="myapp" --strategy=ours
+
+# Automatic: prefer 1Password values on conflict
+op-env-manager sync --vault="Projects" --item="myapp" --strategy=theirs
+
+# Sync a specific section, dry-run first
+op-env-manager sync --vault="Projects" --item="myapp" --section="dev" --dry-run
+```
+
+### Convert legacy .env (op:// references)
+
+```bash
+# Convert a .env file that already contains op:// references into the op-env-manager format
+op-env-manager convert --vault="Personal" --item="myapp" --env-file=.env.template
+```
+
+### Generate .env.op template
+
+```bash
+# Generate template with op:// references from existing 1Password item
+op-env-manager template --vault="Personal" --item="myapp"
+
+# Merge with an existing .env.example to preserve structure and comments
+op-env-manager template --vault="Personal" --item="myapp" --env-file=.env.example
+
+# Custom output path
+op-env-manager template --vault="Personal" --item="myapp" --output=.env.template
 ```
 
 ## Typical Workflows
@@ -68,8 +136,11 @@ op-env-manager run --vault "Production" -- python manage.py migrate
 # 1. Sign in to 1Password
 op signin
 
-# 2. Push your .env to 1Password
-op-env-manager push --vault "Personal" --env .env
+# 2. Run the interactive wizard (recommended)
+op-env-manager init
+
+# Or manually push your .env to 1Password
+op-env-manager push --vault="Personal" --env-file=.env
 
 # 3. Add .env to .gitignore
 echo ".env" >> .gitignore
@@ -88,25 +159,29 @@ git commit -m "Add .env files to gitignore"
 op signin
 
 # 2. Pull secrets from shared vault
-op-env-manager inject --vault "MyApp-Dev" --output .env.local
+op-env-manager inject --vault="MyApp-Dev" --output=.env.local
 
 # 3. Start development
-op-env-manager run --vault "MyApp-Dev" -- docker compose up
+op-env-manager run --vault="MyApp-Dev" -- docker compose up
 ```
 
 ### Multi-Environment Setup
 
 ```bash
-# Push different environments to different vaults
-op-env-manager push --vault "MyApp-Dev" --env .env.dev
-op-env-manager push --vault "MyApp-Staging" --env .env.staging
-op-env-manager push --vault "MyApp-Prod" --env .env.prod
+# Option A: separate items per environment (separate vaults)
+op-env-manager push --vault="MyApp-Dev" --env-file=.env.dev
+op-env-manager push --vault="MyApp-Staging" --env-file=.env.staging
+op-env-manager push --vault="MyApp-Prod" --env-file=.env.prod
+
+# Option B: sections in a single item
+op-env-manager push --vault="Projects" --item="myapp" --section="dev" --env-file=.env.dev
+op-env-manager push --vault="Projects" --item="myapp" --section="prod" --env-file=.env.prod
 
 # Inject as needed
-op-env-manager inject --vault "MyApp-Staging" --output .env.staging
+op-env-manager inject --vault="MyApp-Staging" --output=.env.staging
 
 # Run in specific environment
-op-env-manager run --vault "MyApp-Prod" -- docker compose up -d
+op-env-manager run --vault="MyApp-Prod" -- docker compose up -d
 ```
 
 ### Secret Rotation
@@ -115,11 +190,14 @@ op-env-manager run --vault "MyApp-Prod" -- docker compose up -d
 # 1. Update secret in 1Password (via UI or CLI)
 op item edit "env-secrets-DATABASE_PASSWORD" password="new-secure-password"
 
-# 2. Team members pull updated secrets
-op-env-manager inject --vault "MyApp-Dev" --output .env.local --overwrite
+# 2. Check what has changed before pulling
+op-env-manager diff --vault="MyApp-Dev" --item="myapp"
+
+# 3. Team members pull updated secrets
+op-env-manager inject --vault="MyApp-Dev" --output=.env.local --overwrite
 
 # Or just run with updated secrets (no file created)
-op-env-manager run --vault "MyApp-Dev" -- docker compose restart
+op-env-manager run --vault="MyApp-Dev" -- docker compose restart
 ```
 
 ## Quick Troubleshooting
@@ -177,29 +255,81 @@ op-env-manager run --vault "Production" -- \
 
 - `--help`, `-h` - Show help
 - `--version`, `-v` - Show version
+- `--quiet`, `-q` - Suppress all non-error output (sets `OP_QUIET_MODE=true`)
+
+### Init Command
+
+- _(interactive wizard, no required flags)_
+- `--dry-run` - Preview workflow without making changes
 
 ### Push Command
 
-- `--env FILE` - .env file to push (default: `.env`)
-- `--vault VAULT` - 1Password vault (required)
-- `--item NAME` - Item name prefix (default: `env-secrets`)
+- `--env-file=FILE` - .env file to push (default: `.env`)
+- `--vault=VAULT` - 1Password vault (required)
+- `--item=NAME` - Item name prefix (default: `env-secrets`)
+- `--section=SECTION` - Environment section, e.g. `dev`, `prod` (enables `op://vault/item/$APP_ENV/KEY` references)
+- `--template` - Also generate `.env.op` template file
+- `--template-output=FILE` - Path for template file (default: `.env.op`); implies `--template`
 - `--dry-run` - Preview only
 
 ### Inject Command
 
-- `--vault VAULT` - 1Password vault (required)
-- `--item NAME` - Item name prefix (default: `env-secrets`)
-- `--output FILE` - Output file (default: `.env`)
+- `--vault=VAULT` - 1Password vault (required)
+- `--item=NAME` - Item name prefix (default: `env-secrets`)
+- `--section=SECTION` - Environment section to retrieve
+- `--output=FILE` - Output file (default: `.env`)
 - `--overwrite` - Skip confirmation prompt
 - `--dry-run` - Preview only
 
 ### Run Command
 
-- `--vault VAULT` - 1Password vault (required)
-- `--item NAME` - Item name prefix (default: `env-secrets`)
-- `--env-file FILE` - Additional .env file to merge
+- `--vault=VAULT` - 1Password vault (required)
+- `--item=NAME` - Item name prefix (default: `env-secrets`)
+- `--section=SECTION` - Environment section; also sets `APP_ENV` for the subprocess
+- `--env-file=FILE` - Additional .env file to merge alongside 1Password secrets
+- `--no-masking` - Show full secret values in output (use carefully)
+- `--template` - Save a `.env.op` template alongside running the command
+- `--template-output=FILE` - Path for template file (default: `.env.op`); implies `--template`
+- `--dry-run` - Preview secret references without executing
 - `--` - Separator before command
 - `<command>` - Command to run with injected secrets
+
+### Diff Command
+
+- `--vault=VAULT` - 1Password vault (required)
+- `--item=NAME` - Item name prefix (default: `env-secrets`)
+- `--env-file=FILE` - Local file to compare (default: `.env`)
+- `--section=SECTION` - Environment section to compare
+- `--dry-run` - Preview without contacting 1Password
+
+### Sync Command
+
+- `--vault=VAULT` - 1Password vault (required)
+- `--item=NAME` - Item name prefix (default: `env-secrets`)
+- `--env-file=FILE` - Local file to sync (default: `.env`)
+- `--section=SECTION` - Environment section to sync
+- `--strategy=STRATEGY` - Conflict resolution: `interactive` (default), `ours`, `theirs`, `newest`
+- `--no-backup` - Skip automatic backup before sync
+- `--dry-run` - Preview changes only
+
+### Convert Command
+
+- `--env-file=FILE` - .env file containing `op://` references (required)
+- `--vault=VAULT` - Target 1Password vault (required)
+- `--item=NAME` - Target item name prefix (default: `env-secrets`)
+- `--section=SECTION` - Environment section
+- `--template` - Also generate `.env.op` template file
+- `--template-output=FILE` - Path for template file (default: `.env.op`); implies `--template`
+- `--dry-run` - Preview only
+
+### Template Command
+
+- `--vault=VAULT` - 1Password vault (required)
+- `--item=NAME` - Item name (default: `env-secrets`)
+- `--section=SECTION` - Environment section
+- `--env-file=FILE` - Existing file to merge with (e.g. `.env.example`); preserves structure and comments
+- `--output=FILE` - Output file path (default: `.env.op`)
+- `--dry-run` - Preview only
 
 ## Examples by Use Case
 

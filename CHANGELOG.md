@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - Interactive Setup & User Experience
 
 #### Init Command
+
 - **Interactive Setup Wizard** (`lib/init.sh`):
   - Guided onboarding for new users and project setup
   - Auto-detection of existing `.env` files in current directory
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Success summary with actionable next steps
 
 #### Progress Indicators
+
 - **Progress Module** (`lib/progress.sh`):
   - Visual progress bars for operations with 100+ variables
   - Auto-detection of CI/CD environments (suppresses progress in CI)
@@ -32,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Format: `[=====>     ] 45/150 (30%) Processing variables...`
 
 #### Global Quiet Mode
+
 - **Quiet Flag** (`--quiet`):
   - Suppresses informational output (`log_info`, `log_step`, `log_success`)
   - Always shows errors and critical warnings
@@ -40,11 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Applies to all commands: `op-env-manager --quiet <command>`
 
 #### Documentation
+
 - **docs/QUICKSTART.md**: Enhanced with init command examples
 - **README.md**: Updated with interactive setup workflow
 - **Testing documentation**: Added init command test coverage
 
 #### Testing
+
 - **tests/unit/test_init.bats**: 70+ unit tests covering:
   - Interactive prompts and defaults
   - Vault selection/creation flow
@@ -56,16 +61,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **tests/unit/test_progress.bats**: Progress bar functionality tests
 
 ### Changed
+
 - **bin/op-env-manager**: Added `init` command to main dispatcher
 - **lib/logger.sh**: Enhanced with quiet mode support
 - **All commands**: Now respect `OP_QUIET_MODE` for CI/CD friendliness
 
 ### Performance Notes
+
 - Progress bars add negligible overhead (<0.1s for 1000+ variables)
 - Auto-suppressed in non-interactive environments (no CI/CD impact)
 - Init wizard completes in <2 minutes for most setups
 
 ### Related Issues
+
 - Closes #10 - Interactive setup wizard (init command)
 - Closes #8 - Progress indicators for large files
 
@@ -76,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - Reliability & Multiline Support
 
 #### Retry Logic with Exponential Backoff
+
 - **Retry Module** (`lib/retry.sh`):
   - Automatic retry for transient 1Password CLI failures
   - Exponential backoff with configurable jitter
@@ -90,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Non-retryable errors: authentication failures, not found, permission denied
 
 #### Multiline Value Support
+
 - **Enhanced .env Parsing**:
   - Support for quoted multiline values in `.env` files
   - Proper handling of newlines within double-quoted strings
@@ -98,26 +108,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Use cases: Private keys, JSON configs, certificates, SQL queries
 
 #### Documentation
+
 - **README.md**: Added retry configuration section
 - **CLAUDE.md**: Comprehensive retry logic documentation with examples
 - **Error handling guide**: Best practices for network resilience
 
 #### Testing
+
 - **tests/unit/test_retry.bats**: Retry logic unit tests
 - **tests/integration/test_multiline.bats**: Multiline value tests
 - **examples/.env.multiline**: Example file with multiline values
 
 ### Changed
+
 - **All commands**: Wrapped 1Password CLI calls with retry logic
 - **lib/push.sh**, **lib/inject.sh**: Enhanced to handle multiline values
 - **lib/convert.sh**: `op read` calls now use retry wrapper
 
 ### Performance Notes
+
 - Default retry sequence: ~7 seconds total (3 retries: 1s, 2s, 4s)
 - Network resilience significantly improved for unstable connections
 - No performance impact when operations succeed on first attempt
 
 ### Related Issues
+
 - Closes #6 - Enhance error messages with actionable suggestions
 - Closes #7 - Add retry logic for network failures
 
@@ -128,6 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - Initial Release
 
 #### Core Functionality
+
 - **Push command**: Upload `.env` files to 1Password vault as individual password items
 - **Inject command**: Download secrets from 1Password into local `.env` files
 - **Run command**: Execute commands with secrets injected from 1Password (no plaintext files)
@@ -136,12 +152,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Help system**: Comprehensive help for all commands
 
 #### Installation & Setup
+
 - **install.sh**: Automated installation script for `~/.local/bin`
 - Cross-platform support (macOS, Linux)
 - Automatic PATH configuration for bash/zsh
 - Prerequisites checking (bash, jq, 1Password CLI)
 
 #### Documentation
+
 - **README.md**: Complete usage guide with examples and workflows
 - **docs/1PASSWORD_SETUP.md**: 1Password CLI installation and configuration guide
 - **docs/QUICKSTART.md**: Quick reference for common tasks
@@ -149,6 +167,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **examples/.env.example**: Example environment file for testing
 
 #### Project Organization
+
 - Modular structure (bin/, lib/, docs/, examples/)
 - MIT License
 - Proper .gitignore for security
@@ -156,6 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Archive of legacy scripts for reference
 
 #### Features
+
 - Individual password items per environment variable (better for automation)
 - Auto-tagging with `op-env-manager` for easy filtering
 - Support for custom vault names
@@ -167,6 +187,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed - Migration from Legacy
 
 #### Breaking Changes from Previous Version
+
 - Moved from Secure Notes with sections to individual password items
 - Changed from `create/update` commands to `push/inject/run` paradigm
 - Removed project-specific references (CNA CRM)
@@ -174,6 +195,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New installation location (`~/.local/bin` instead of project-specific)
 
 #### Improvements
+
 - Simplified command interface
 - Better 1Password CLI integration using recommended practices
 - More modular and maintainable code architecture
@@ -182,6 +204,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for CI/CD workflows with Service Accounts
 
 ### Security
+
 - File permissions set to 600 (owner read/write only) for injected .env files
 - No plaintext secrets when using `run` command
 - Secure handling of 1Password references
@@ -189,6 +212,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recommendations for secret rotation
 
 ### Infrastructure
+
 - Automated tests for all commands
 - Example .env file with 50+ common variables
 - Migration path from legacy scripts
@@ -198,19 +222,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+#### Documentation
+
+- **docs/user-guide/**: New user guide directory with `getting-started.md` and index (`README.md`)
+- **docs/docs-registry.yaml**: New registry tracking all 8 user-facing docs with status and version links
+- **docs/QUICKSTART.md**: Comprehensive flags reference updated — added `--quiet/-q` global flag, `--section`, `--template`, `--template-output`, `--no-masking`; added missing init/diff/sync/convert/template command subsections; corrected `--env` → `--env-file`
+- **docs/1PASSWORD_SETUP.md**: Sign-in section split into desktop app integration vs headless/server paths
+- **docs/1password-formats.md**: Added `$APP_ENV` dynamic reference format, multiline value round-trip documentation, silent field-type filtering behavior
+- **docs/CI_CD_EXAMPLES.md**: Added `--quiet` flag to all CircleCI, GitHub Actions, GitLab CI, Jenkins pipeline examples; added `--overwrite` to Docker inject examples
+- **docs/CONVERT_FEATURE.md**: Corrected `--env` → `--env-file` throughout; fixed create-vs-overwrite accuracy for existing items; added `--template`/`--template-output` flags
+- **docs/TEAM_COLLABORATION.md**: Added Diff and Sync Workflows section covering `diff`, `sync` strategies, interactive conflict prompts, state file, and `.gitignore` recommendations
+- **docs/PERFORMANCE.md**: Fixed inject benchmark table (threshold 100, not 50); added `**Note:**` disclaimers to v0.5.0 verification sections; fixed misleading "reduce parallelism" troubleshooting
+
 ### Planned Features
 
 #### v0.4.0
+
 - [ ] `diff` command - Compare local .env with 1Password
 - [ ] `sync` command - Bidirectional sync with conflict resolution
 - [ ] Enhanced logging with verbosity levels
 
 #### v0.5.0
+
 - [ ] Performance optimizations (parallel operations, caching)
 - [ ] Batch field operations optimization
 - [ ] Performance benchmarking and documentation
 
 #### v1.0.0
+
 - [ ] `rotate` command - Generate new secrets and update
 - [ ] Support for .env.schema validation
 - [ ] Homebrew tap for easier installation
@@ -218,6 +259,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [ ] GitHub Action for workflows
 
 #### Future Considerations
+
 - Multi-vault injection (merge from multiple vaults)
 - Secret expiration warnings
 - Audit trail logging

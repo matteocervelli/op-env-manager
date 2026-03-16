@@ -74,7 +74,7 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
-          op-env-manager run \
+          op-env-manager --quiet run \
             --vault "Production" \
             --item "myapp" \
             --section "test" \
@@ -84,7 +84,7 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
-          op-env-manager run \
+          op-env-manager --quiet run \
             --vault "Production" \
             --item "myapp" \
             --section "build" \
@@ -95,7 +95,7 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
-          op-env-manager run \
+          op-env-manager --quiet run \
             --vault "Production" \
             --item "myapp" \
             --section "production" \
@@ -186,11 +186,12 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
-          op-env-manager inject \
+          op-env-manager --quiet inject \
             --vault "Production" \
             --item "myapp" \
             --section "build" \
-            --output .env.build
+            --output .env.build \
+            --overwrite
 
       - name: Build Docker image
         run: |
@@ -283,14 +284,14 @@ before_script:
 test:
   stage: test
   script:
-    - op-env-manager run --vault "Production" --item "myapp" --section "test" -- npm test
+    - op-env-manager --quiet run --vault "Production" --item "myapp" --section "test" -- npm test
   only:
     - branches
 
 build:
   stage: build
   script:
-    - op-env-manager run --vault "Production" --item "myapp" --section "build" -- npm run build
+    - op-env-manager --quiet run --vault "Production" --item "myapp" --section "build" -- npm run build
   artifacts:
     paths:
       - dist/
@@ -302,7 +303,7 @@ build:
 deploy_production:
   stage: deploy
   script:
-    - op-env-manager run --vault "Production" --item "myapp" --section "production" -- ./deploy.sh
+    - op-env-manager --quiet run --vault "Production" --item "myapp" --section "production" -- ./deploy.sh
   environment:
     name: production
     url: https://myapp.com
@@ -312,7 +313,7 @@ deploy_production:
 deploy_staging:
   stage: deploy
   script:
-    - op-env-manager run --vault "Production" --item "myapp" --section "staging" -- ./deploy.sh
+    - op-env-manager --quiet run --vault "Production" --item "myapp" --section "staging" -- ./deploy.sh
   environment:
     name: staging
     url: https://staging.myapp.com
@@ -334,12 +335,12 @@ deploy_staging:
     - git clone https://github.com/matteocervelli/op-env-manager.git /tmp/op-env-manager
     - ln -s /tmp/op-env-manager/bin/op-env-manager /usr/local/bin/op-env-manager
   script:
-    - op-env-manager run --vault "$VAULT" --item "$ITEM" --section "$SECTION" -- ./deploy.sh
+    - op-env-manager --quiet run --vault "$VAULT" --item "$ITEM" --section "$SECTION" -- ./deploy.sh
 
 # .gitlab-ci.yml (in project)
 include:
-  - project: 'my-group/ci-templates'
-    file: '.gitlab-ci-template.yml'
+  - project: "my-group/ci-templates"
+    file: ".gitlab-ci-template.yml"
 
 deploy:production:
   extends: .deploy_template
@@ -397,7 +398,7 @@ pipeline {
         stage('Test') {
             steps {
                 sh '''
-                    op-env-manager run \
+                    op-env-manager --quiet run \
                         --vault "$VAULT" \
                         --item "$ITEM" \
                         --section "test" \
@@ -409,7 +410,7 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
-                    op-env-manager run \
+                    op-env-manager --quiet run \
                         --vault "$VAULT" \
                         --item "$ITEM" \
                         --section "build" \
@@ -426,7 +427,7 @@ pipeline {
                 script {
                     def section = env.BRANCH_NAME == 'main' ? 'production' : 'staging'
                     sh """
-                        op-env-manager run \
+                        op-env-manager --quiet run \
                             --vault "$VAULT" \
                             --item "$ITEM" \
                             --section "$section" \
@@ -488,7 +489,7 @@ node {
     stage('Deploy') {
         withCredentials([string(credentialsId: 'op-service-account-token', variable: 'OP_SERVICE_ACCOUNT_TOKEN')]) {
             sh """
-                /usr/local/bin/op-env-manager-${BUILD_NUMBER} run \
+                /usr/local/bin/op-env-manager-${BUILD_NUMBER} --quiet run \
                     --vault "${params.VAULT}" \
                     --item "myapp" \
                     --section "${params.ENVIRONMENT}" \
@@ -548,7 +549,7 @@ jobs:
       - run:
           name: Run tests with secrets
           command: |
-            op-env-manager run \
+            op-env-manager --quiet run \
               --vault "Production" \
               --item "myapp" \
               --section "test" \
@@ -562,7 +563,7 @@ jobs:
       - run:
           name: Build with secrets
           command: |
-            op-env-manager run \
+            op-env-manager --quiet run \
               --vault "Production" \
               --item "myapp" \
               --section "build" \
@@ -582,7 +583,7 @@ jobs:
       - run:
           name: Deploy to production
           command: |
-            op-env-manager run \
+            op-env-manager --quiet run \
               --vault "Production" \
               --item "myapp" \
               --section "production" \
@@ -611,6 +612,7 @@ workflows:
 ### Security
 
 1. **Service Account Permissions**:
+
    ```bash
    # Grant minimal permissions
    # ✓ Read-only access to specific vaults
@@ -632,6 +634,7 @@ workflows:
 ### Performance
 
 1. **Caching**:
+
    ```yaml
    # Cache op-env-manager installation
    - uses: actions/cache@v3
@@ -641,6 +644,7 @@ workflows:
    ```
 
 2. **Parallel Jobs**:
+
    ```yaml
    # Safe: Multiple read operations in parallel
    - name: Run tests (parallel safe)
@@ -651,6 +655,7 @@ workflows:
    ```
 
 3. **Use `run` Command**:
+
    ```bash
    # ✓ Prefer run (no temp files, faster)
    op-env-manager run --vault "Prod" --item "app" -- command
@@ -663,6 +668,7 @@ workflows:
 ### Reliability
 
 1. **Dry-Run Testing**:
+
    ```yaml
    - name: Validate secrets exist
      run: |
@@ -670,6 +676,7 @@ workflows:
    ```
 
 2. **Error Handling**:
+
    ```yaml
    - name: Deploy with error handling
      run: |
@@ -692,6 +699,7 @@ workflows:
 ### Debugging
 
 1. **Verbose Logging**:
+
    ```bash
    # Enable 1Password CLI debug mode
    export OP_DEBUG=1
@@ -699,6 +707,7 @@ workflows:
    ```
 
 2. **Test Locally**:
+
    ```bash
    # Simulate CI environment
    export OP_SERVICE_ACCOUNT_TOKEN="your-token"
@@ -722,6 +731,7 @@ workflows:
 ### Common Issues
 
 **"Not signed in to 1Password CLI"**:
+
 ```yaml
 # Ensure OP_SERVICE_ACCOUNT_TOKEN is set
 env:
@@ -729,6 +739,7 @@ env:
 ```
 
 **"Vault not found"**:
+
 ```bash
 # Vault names are case-sensitive
 # Check service account has access to vault
@@ -736,12 +747,14 @@ op vault list
 ```
 
 **"Item not found"**:
+
 ```bash
 # Ensure item exists and service account has access
 op item list --vault "Production" --tags "op-env-manager"
 ```
 
 **Network timeouts**:
+
 ```yaml
 # Add retry logic
 - name: Deploy with retry

@@ -9,6 +9,7 @@ The `convert` command enables migration from 1Password's native secret reference
 ### 1. Two Distinct 1Password Workflows Exist
 
 **Native op:// Reference Format**:
+
 - Used with `op run` and `op inject` commands
 - `.env` files contain `op://vault/item/field` URIs
 - Secrets stored in manually-created 1Password items
@@ -16,6 +17,7 @@ The `convert` command enables migration from 1Password's native secret reference
 - Common in legacy projects and CI/CD pipelines
 
 **op-env-manager Format**:
+
 - Automated Secure Note creation with all variables as fields
 - Bidirectional sync (push/inject)
 - Single item per environment (optionally with sections)
@@ -25,11 +27,13 @@ The `convert` command enables migration from 1Password's native secret reference
 ### 2. Why Both Formats Matter
 
 **Teams often have**:
+
 - Legacy projects using `op://` references
 - New projects wanting automated management
 - Desire to standardize but can't migrate everything at once
 
 **Solution**: The `convert` command allows:
+
 - Incremental migration from `op://` to op-env-manager
 - Both formats to coexist
 - Teams to evaluate both approaches with real data
@@ -37,16 +41,19 @@ The `convert` command enables migration from 1Password's native secret reference
 ### 3. Technical Challenges Addressed
 
 **Challenge 1: Resolving Secret References Without Plaintext Files**
+
 - ❌ Initial idea: `op inject` to temp file, then push
 - ✅ Better: Parse line-by-line, use `op read` for each reference
 - **Result**: No temporary plaintext files, more secure
 
 **Challenge 2: Embedded References in Strings**
+
 - Example: `DATABASE_URL=postgresql://user:op://vault/item/field@host/db`
 - Solution: Regex detection and substitution preserves surrounding text
 - **Result**: Complex connection strings work correctly
 
 **Challenge 3: Handling Non-Secret Variables**
+
 - Challenge: Not all variables have `op://` references
 - Example: `APP_NAME=MyApp`, `DEBUG=true`
 - Solution: Include non-secret variables as-is
@@ -55,22 +62,43 @@ The `convert` command enables migration from 1Password's native secret reference
 ### 4. Implementation Patterns
 
 **Modular Command Structure**:
+
 ```
 lib/convert.sh    # Standalone command module
 bin/op-env-manager # Dispatcher loads module
 ```
 
 **Shared Code Reuse**:
+
 - Uses same push logic from `lib/push.sh` patterns
 - Reuses logger utilities
 - Follows established argument parsing conventions
 
 **Dry-Run Support**:
+
 - Always implement `--dry-run` first
 - Preview operations before executing
 - Critical for migration commands (irreversible)
+- `--dry-run` also skips the 1Password authentication check entirely
+
+**Template Generation**:
+
+- `--template` flag generates a `.env.op` file alongside conversion
+- `--template-output=FILE` overrides the default output path (`.env.op`)
+- Generated file contains `op://` references for the newly created item
+- Useful when you want both the converted item and a shareable template
+
+**Performance**:
+
+- All `op read` calls are batched and resolved in parallel (bulk resolution)
+- Item existence check uses an in-memory cache to avoid redundant API calls
+
+**Default Behaviour**:
+
+- `--item` is optional; defaults to `env-secrets` when omitted
 
 **Error Handling**:
+
 - Gracefully handle missing references
 - Continue on single-field failures (with warnings)
 - Validate authentication before processing
@@ -82,6 +110,7 @@ bin/op-env-manager # Dispatcher loads module
 **Scenario**: Project uses `.env.template` with `op://` references, team wants op-env-manager benefits
 
 **Before**:
+
 ```bash
 # .env.template (in git)
 API_KEY=op://Production/api-keys/stripe_key
@@ -94,10 +123,11 @@ op run --env-file=.env.template -- docker compose up
 ```
 
 **After**:
+
 ```bash
 # One-time conversion
 op-env-manager convert \
-  --env .env.template \
+  --env-file=.env.template \
   --vault "Production" \
   --item "myapp"
 
@@ -114,17 +144,18 @@ op run --env-file=.env.template -- docker compose up
 **Scenario**: Different teams use different formats, want unified approach
 
 **Solution**:
+
 ```bash
 # Convert dev (uses op://)
 op-env-manager convert \
-  --env .env.dev.template \
+  --env-file=.env.dev.template \
   --vault "MyApp" \
   --item "myapp" \
   --section "dev"
 
 # Convert prod (uses op://)
 op-env-manager convert \
-  --env .env.prod.template \
+  --env-file=.env.prod.template \
   --vault "MyApp" \
   --item "myapp" \
   --section "prod"
@@ -138,9 +169,10 @@ op-env-manager convert \
 **Scenario**: Team wants to try op-env-manager without abandoning current workflow
 
 **Approach**:
+
 ```bash
 # Convert current secrets to evaluate
-op-env-manager convert --env .env.template --vault "Test" --item "trial" --dry-run
+op-env-manager convert --env-file=.env.template --vault "Test" --item "trial" --dry-run
 
 # Test the new workflow
 op-env-manager run --vault "Test" --item "trial" -- docker compose up
@@ -156,11 +188,13 @@ op run --env-file=.env.template -- docker compose up
 ### Decision 1: No Temporary Files
 
 **Options considered**:
+
 1. `op inject` to temp file → `op-env-manager push` (simple)
 2. Parse line-by-line with `op read` (secure)
 
 **Chosen**: Option 2
 **Rationale**:
+
 - Security: No plaintext secrets on disk
 - Atomic: Single operation, no cleanup needed
 - Consistency: Matches `run` command philosophy
@@ -168,11 +202,13 @@ op run --env-file=.env.template -- docker compose up
 ### Decision 2: Include Non-Secret Variables
 
 **Options considered**:
+
 1. Only convert variables with `op://` references
 2. Include all variables from source file
 
 **Chosen**: Option 2
 **Rationale**:
+
 - Completeness: Entire environment captured
 - Convenience: No need to merge secret/non-secret files
 - Transparency: See all config in one place
@@ -180,11 +216,13 @@ op run --env-file=.env.template -- docker compose up
 ### Decision 3: Preserve Embedded References
 
 **Options considered**:
+
 1. Only support `VAR=op://...` (full line)
 2. Support embedded like `VAR=prefix:op://...:suffix`
 
 **Chosen**: Option 2
 **Rationale**:
+
 - Real-world usage: Connection strings often embed secrets
 - Flexibility: Works with complex configurations
 - Compatibility: Matches `op inject` behavior
@@ -194,6 +232,7 @@ op run --env-file=.env.template -- docker compose up
 ### Unit-Level Testing (Manual)
 
 Test individual components:
+
 ```bash
 # Test op:// detection
 has_op_reference "op://vault/item/field"  # Should return true
@@ -209,6 +248,7 @@ resolve_op_reference "op://Personal/test/password"
 ### Integration Testing
 
 Full workflow test:
+
 1. Create test items in 1Password
 2. Create `.env.template` with references
 3. Test dry-run (preview)
@@ -233,22 +273,26 @@ Full workflow test:
 ## Documentation Strategy
 
 ### 1. Feature Documentation (This File)
+
 - Technical overview
 - Design decisions
 - Lessons learned
 - For developers/contributors
 
 ### 2. Format Comparison Guide
+
 - **File**: `docs/1password-formats.md`
 - **Audience**: Users choosing between workflows
 - **Content**: Side-by-side comparison, migration paths, use cases
 
 ### 3. Testing Guide
+
 - **File**: `docs/CONVERT_TESTING.md`
 - **Audience**: Users wanting to test/verify
 - **Content**: Step-by-step test procedure, expected outputs
 
 ### 4. User Documentation
+
 - **File**: `README.md`
 - **Audience**: All users
 - **Content**: Quick start, examples, common workflows
@@ -260,6 +304,7 @@ Full workflow test:
 **Current**: `op://` → op-env-manager only
 
 **Future**: op-env-manager → `op://` generation
+
 ```bash
 op-env-manager export \
   --vault "Personal" \
@@ -275,6 +320,7 @@ op-env-manager export \
 **Current**: One file at a time
 
 **Future**: Convert multiple files/environments
+
 ```bash
 op-env-manager convert \
   --vault "MyApp" \
@@ -289,12 +335,13 @@ op-env-manager convert \
 
 ### Enhancement 3: Conflict Detection
 
-**Current**: Overwrites existing items
+**Current**: Detects whether the target item exists and calls `op item create` or `op item edit` accordingly. No field-level merge or skip logic — all fields are set/overwritten.
 
 **Future**: Detect conflicts, offer merge/skip
+
 ```bash
 op-env-manager convert \
-  --env .env.template \
+  --env-file=.env.template \
   --vault "Personal" \
   --item "myapp" \
   --on-conflict merge  # or skip, overwrite, prompt
@@ -305,9 +352,10 @@ op-env-manager convert \
 ### Enhancement 4: Validation
 
 **Future**: Validate references before conversion
+
 ```bash
 op-env-manager convert \
-  --env .env.template \
+  --env-file=.env.template \
   --vault "Personal" \
   --validate-only
 ```
@@ -318,11 +366,13 @@ op-env-manager convert \
 ## Metrics & Success Criteria
 
 ### Adoption Metrics
+
 - Number of `convert` command uses
 - Projects migrated from `op://` to op-env-manager
 - User feedback on GitHub issues/discussions
 
 ### Success Criteria
+
 - ✅ Command executes without errors for valid inputs
 - ✅ All `op://` references resolved correctly
 - ✅ Non-secret variables preserved
@@ -341,6 +391,7 @@ op-env-manager convert \
 ### Threat: Logging Sensitive Values
 
 **Mitigation**:
+
 - Never log resolved secret values
 - Mask in dry-run output: `[RESOLVED:op://...]`
 - Use truncation for display: `${value:0:20}...`
@@ -348,6 +399,7 @@ op-env-manager convert \
 ### Threat: Invalid Reference Resolution
 
 **Mitigation**:
+
 - Validate reference format with regex
 - Handle `op read` failures gracefully
 - Skip invalid references with warnings
@@ -356,6 +408,7 @@ op-env-manager convert \
 ### Threat: Cross-Vault Reference Confusion
 
 **Mitigation**:
+
 - Document that references can point to different vaults
 - Warn user if references span multiple vaults
 - Consider `--strict` mode requiring single vault

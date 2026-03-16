@@ -1,0 +1,78 @@
+meta:
+  project: tool-op-env-manager
+  version: "0.3.0"
+  last_audit: "2026-03-16"
+  mode: internal
+
+docs:
+  getting-started:
+    file: docs/user-guide/getting-started.md
+    type: getting-started
+    feature: onboarding
+    last_updated: "2026-03-16"
+    status: published
+    linked_version: "0.3.0"
+    notes: "New file — to be created and verified"
+
+  quickstart:
+    file: docs/QUICKSTART.md
+    type: reference
+    feature: all-commands
+    last_updated: "2026-03-16"
+    status: published
+    linked_version: "0.3.0"
+    notes: "Stale — missing diff/sync/init commands added in 0.3.0"
+
+  1password-setup:
+    file: docs/1PASSWORD_SETUP.md
+    type: how-to
+    feature: setup
+    last_updated: "2026-03-16"
+    status: published
+    linked_version: "0.3.0"
+    notes: "Needs verification against current install flow"
+
+  1password-formats:
+    file: docs/1password-formats.md
+    type: reference
+    feature: 1password-integration
+    last_updated: "2026-03-16"
+    status: published
+    linked_version: "0.3.0"
+    notes: "Needs verification for multiline/section support"
+
+  ci-cd-examples:
+    file: docs/CI_CD_EXAMPLES.md
+    type: how-to
+    feature: ci-cd
+    last_updated: "2026-03-16"
+    status: published
+    linked_version: "0.3.0"
+    notes: "Needs verification for quiet mode + service account examples"
+
+  convert-feature:
+    file: docs/CONVERT_FEATURE.md
+    type: feature-guide
+    feature: convert
+    last_updated: "2026-03-16"
+    status: published
+    linked_version: "0.3.0"
+    notes: "Needs verification against current convert implementation"
+
+  team-collaboration:
+    file: docs/TEAM_COLLABORATION.md
+    type: how-to
+    feature: team-workflows
+    last_updated: "2026-03-16"
+    status: published
+    linked_version: "0.3.0"
+    notes: "Needs verification for sync command and init wizard"
+
+  performance:
+    file: docs/PERFORMANCE.md
+    type: reference
+    feature: performance
+    last_updated: "2026-03-16"
+    status: published
+    linked_version: "0.3.0"
+    notes: "Needs verification against actual benchmarks"

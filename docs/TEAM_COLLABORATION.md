@@ -8,6 +8,7 @@ Best practices for using `op-env-manager` with development teams, from onboardin
 - [Vault Organization](#vault-organization)
 - [Onboarding New Team Members](#onboarding-new-team-members)
 - [Multi-Environment Workflows](#multi-environment-workflows)
+- [Diff and Sync Workflows](#diff-and-sync-workflows)
 - [Secret Rotation](#secret-rotation)
 - [Access Control](#access-control)
 - [Communication Protocols](#communication-protocols)
@@ -22,6 +23,7 @@ Best practices for using `op-env-manager` with development teams, from onboardin
 **Step 1: Choose vault strategy** (see [Vault Organization](#vault-organization))
 
 **Step 2: Create team vault(s)**:
+
 ```bash
 # In 1Password UI:
 # 1. Create vault: "MyApp - Development"
@@ -30,6 +32,7 @@ Best practices for using `op-env-manager` with development teams, from onboardin
 ```
 
 **Step 3: Push initial secrets**:
+
 ```bash
 # Team lead pushes production secrets
 op-env-manager push \
@@ -47,6 +50,7 @@ op-env-manager push \
 ```
 
 **Step 4: Generate templates for git**:
+
 ```bash
 # Create .env.op template (safe for version control)
 op-env-manager template \
@@ -61,6 +65,7 @@ git commit -m "Add environment variable template"
 ```
 
 **Step 5: Document the workflow**:
+
 ```markdown
 # Add to project README.md
 
@@ -84,6 +89,7 @@ Ask team lead for vault access if you encounter permission errors.
 **Best for**: Small teams (2-5 people), single application
 
 **Structure**:
+
 ```
 Vault: "MyApp"
 └── Item: "myapp"
@@ -102,15 +108,18 @@ Vault: "MyApp"
 ```
 
 **Pros**:
+
 - Simple to manage
 - Easy to compare environments
 - Single vault to share
 
 **Cons**:
+
 - All team members see all environments
 - Can't restrict production access separately
 
 **Usage**:
+
 ```bash
 # Dynamic section selection with APP_ENV
 APP_ENV=development op-env-manager run --vault "MyApp" --item "myapp" -- npm start
@@ -122,6 +131,7 @@ APP_ENV=production op-env-manager run --vault "MyApp" --item "myapp" -- npm star
 **Best for**: Medium to large teams (5+ people), strict access control
 
 **Structure**:
+
 ```
 Vault: "MyApp - Development"
 └── Item: "myapp"
@@ -143,15 +153,18 @@ Vault: "MyApp - Production"
 ```
 
 **Pros**:
+
 - Granular access control
 - Production secrets isolated
 - Clear audit trail per environment
 
 **Cons**:
+
 - More vaults to manage
 - Harder to compare environments
 
 **Access Control**:
+
 ```
 Vault                    | Developers | DevOps | Seniors
 -------------------------|------------|--------|--------
@@ -161,6 +174,7 @@ MyApp - Production       | None       | RO     | RW
 ```
 
 **Usage**:
+
 ```bash
 # Developers use dev vault
 op-env-manager inject --vault "MyApp - Development" --item "myapp"
@@ -174,6 +188,7 @@ op-env-manager run --vault "MyApp - Production" --item "myapp" -- ./deploy.sh
 **Best for**: Multiple projects, complex team structure
 
 **Structure**:
+
 ```
 Vault: "Shared Services"
 └── Item: "database"
@@ -195,6 +210,7 @@ Vault: "MyApp - Production"
 ```
 
 **Usage**:
+
 ```bash
 # Inject from multiple vaults (manual merge)
 op-env-manager inject --vault "Shared Services" --item "database" --output .env.shared
@@ -212,19 +228,43 @@ rm .env.shared .env.app
 ### Onboarding Checklist
 
 **For Team Lead**:
+
 - [ ] Add new member to 1Password team
 - [ ] Grant access to appropriate vaults
 - [ ] Send onboarding documentation
 - [ ] Schedule pairing session
 
 **For New Team Member**:
+
 - [ ] Install 1Password desktop app
 - [ ] Install 1Password CLI ([guide](1PASSWORD_SETUP.md))
 - [ ] Sign in to 1Password CLI: `op signin`
 - [ ] Verify vault access: `op vault list`
 - [ ] Install op-env-manager
 - [ ] Clone project repository
+- [ ] Run the interactive init wizard: `op-env-manager init`
 - [ ] Inject secrets and run app
+
+### Init Wizard (v0.3.0+)
+
+The `init` command provides an interactive setup wizard that guides new team members through vault selection, item naming, and initial configuration in under 2 minutes:
+
+```bash
+# Start the interactive setup wizard
+op-env-manager init
+
+# Preview wizard flow without making changes
+op-env-manager init --dry-run
+```
+
+The wizard:
+
+- Detects existing `.env` files in the current directory
+- Lists available vaults and lets you select or create one
+- Prompts for item naming with sensible defaults
+- Offers multi-environment strategy selection (separate items or sections)
+- Optionally generates an `.env.op` template file
+- Prints actionable next steps on completion
 
 ### Onboarding Script
 
@@ -299,6 +339,7 @@ echo "  3. Check Slack #dev channel for team updates"
 ```
 
 **Usage**:
+
 ```bash
 # New team member runs:
 ./scripts/onboard.sh
@@ -311,6 +352,7 @@ echo "  3. Check Slack #dev channel for team updates"
 ### Development Workflow
 
 **Individual developer setup**:
+
 ```bash
 # Each developer has own local .env
 op-env-manager inject \
@@ -324,6 +366,7 @@ npm run dev
 ```
 
 **Shared development database**:
+
 ```bash
 # All developers use same dev database credentials
 # Stored in shared development vault
@@ -342,6 +385,7 @@ op-env-manager run \
 ### Staging Workflow
 
 **Automated deployment**:
+
 ```yaml
 # .github/workflows/deploy-staging.yml
 - name: Deploy to staging
@@ -355,6 +399,7 @@ op-env-manager run \
 ```
 
 **Manual staging deployment**:
+
 ```bash
 # DevOps engineer deploys manually
 op-env-manager run \
@@ -366,6 +411,7 @@ op-env-manager run \
 ### Production Workflow
 
 **Controlled production access**:
+
 ```bash
 # Only senior engineers / DevOps have production vault access
 
@@ -384,11 +430,64 @@ op-env-manager run \
 
 ---
 
+## Diff and Sync Workflows
+
+### Diff: Compare Local vs 1Password
+
+Use `diff` before pulling to see what changed remotely, or before pushing to confirm what you're sending.
+
+```bash
+# Compare default .env vs 1Password
+op-env-manager diff --vault "MyApp-Dev" --item "myapp"
+
+# Compare specific file and section
+op-env-manager diff --vault "Projects" --item "myapp" --section "dev" --env-file .env.dev
+```
+
+Output symbols: `+` = only in 1Password, `-` = only in local, `~` = value differs, `=` = identical.
+
+Exit codes: `0` = identical, `1` = differences found, `2` = error.
+
+### Sync: Bidirectional Sync with Conflict Resolution
+
+```bash
+# Interactive sync (prompts on each conflict)
+op-env-manager sync --vault "MyApp-Dev" --item "myapp" --env-file .env
+
+# Auto-resolve: keep local
+op-env-manager sync --vault "MyApp-Dev" --item "myapp" --strategy ours
+
+# Auto-resolve: keep remote (1Password)
+op-env-manager sync --vault "MyApp-Dev" --item "myapp" --strategy theirs
+
+# Auto-resolve: keep newer value
+op-env-manager sync --vault "MyApp-Dev" --item "myapp" --strategy newest
+
+# CI/CD: quiet non-interactive sync
+op-env-manager --quiet sync --vault "MyApp-Dev" --item "myapp" --strategy theirs
+```
+
+Interactive conflict prompt choices: `[l]ocal`, `[r]emote`, `[e]dit`, `[s]kip`.
+
+### State Tracking
+
+Sync stores state in `.op-env-manager.state` (SHA256 checksums of last sync). Add to `.gitignore`:
+
+```bash
+echo ".op-env-manager.state" >> .gitignore
+echo ".op-env-manager/" >> .gitignore   # backup directory
+```
+
+Backups before each sync are stored in `.op-env-manager/backups/`.
+
+---
+
 ## Secret Rotation
 
 ### Rotation Strategy
 
 **Quarterly rotation schedule**:
+
 ```
 Q1: Rotate all API keys
 Q2: Rotate database passwords
@@ -399,12 +498,14 @@ Q4: Rotate third-party service credentials
 ### Rotation Workflow
 
 **Step 1: Generate new secret**:
+
 ```bash
 # Generate new secret (using your preferred method)
 NEW_API_KEY=$(openssl rand -hex 32)
 ```
 
 **Step 2: Update 1Password**:
+
 ```bash
 # Update in 1Password (manually or via script)
 # Use 1Password UI or CLI:
@@ -414,6 +515,7 @@ op item edit "myapp" \
 ```
 
 **Step 3: Deploy with new secret**:
+
 ```bash
 # Deploy application with updated secret
 op-env-manager run \
@@ -423,6 +525,7 @@ op-env-manager run \
 ```
 
 **Step 4: Verify and notify**:
+
 ```bash
 # Verify application works with new secret
 ./scripts/health-check.sh
@@ -480,6 +583,7 @@ echo "  4. Notify team in Slack"
 ```
 
 **Usage**:
+
 ```bash
 ./scripts/rotate-secret.sh API_KEY "MyApp - Production" "myapp"
 ```
@@ -490,22 +594,24 @@ echo "  4. Notify team in Slack"
 
 ### Permission Matrix
 
-| Role | Development Vault | Staging Vault | Production Vault |
-|------|------------------|---------------|------------------|
-| **Junior Developer** | Read/Write | Read-Only | None |
-| **Senior Developer** | Read/Write | Read/Write | Read-Only |
-| **Tech Lead** | Read/Write | Read/Write | Read/Write |
-| **DevOps Engineer** | Read/Write | Read/Write | Read/Write |
-| **CI/CD Service Account** | Read-Only | Read-Only | Read-Only |
+| Role                      | Development Vault | Staging Vault | Production Vault |
+| ------------------------- | ----------------- | ------------- | ---------------- |
+| **Junior Developer**      | Read/Write        | Read-Only     | None             |
+| **Senior Developer**      | Read/Write        | Read/Write    | Read-Only        |
+| **Tech Lead**             | Read/Write        | Read/Write    | Read/Write       |
+| **DevOps Engineer**       | Read/Write        | Read/Write    | Read/Write       |
+| **CI/CD Service Account** | Read-Only         | Read-Only     | Read-Only        |
 
 ### Setting Up Permissions
 
 **In 1Password UI**:
+
 1. Go to vault → **Manage Access**
 2. Add team members with appropriate roles
 3. Set permissions: **View**, **View & Copy**, **Edit**, or **Manage**
 
 **Recommended permissions**:
+
 - Development: **Edit** (all developers)
 - Staging: **View & Copy** (developers), **Edit** (seniors/DevOps)
 - Production: **None** (juniors), **View & Copy** (seniors), **Edit** (DevOps only)
@@ -535,12 +641,14 @@ Vaults: "MyApp - Production" (read-only)
 ### When to Notify Team
 
 **Always notify for**:
+
 - ✅ Production secret rotation
 - ✅ Vault permission changes
 - ✅ Breaking changes to .env structure
 - ✅ New required environment variables
 
 **Optional notification for**:
+
 - ⚠️ Development vault updates
 - ⚠️ New optional environment variables
 
@@ -560,6 +668,7 @@ curl -X POST -H 'Content-type: application/json' \
 ```
 
 **Usage**:
+
 ```bash
 # After secret rotation
 ./scripts/notify-slack.sh "🔑 Rotated API_KEY in production vault"
@@ -571,6 +680,7 @@ curl -X POST -H 'Content-type: application/json' \
 ### Documentation Updates
 
 **Keep these updated**:
+
 - `README.md` - Environment setup section
 - `.env.example` - Example values for all variables
 - `.env.op` - Template with op:// references
@@ -585,6 +695,7 @@ curl -X POST -H 'Content-type: application/json' \
 **Cause**: Team member doesn't have vault access
 
 **Solution**:
+
 ```bash
 # Team member checks available vaults
 op vault list
@@ -600,6 +711,7 @@ op vault list  # Should now see vault
 **Cause**: Multiple developers modifying .env.example
 
 **Solution**:
+
 ```bash
 # Never commit .env files (except .env.example)
 # Use .env.op template instead
@@ -620,11 +732,13 @@ op-env-manager inject --vault "MyApp - Development" --output .env.local
 **Response plan**:
 
 1. **Immediate**: Rotate compromised secret
+
    ```bash
    ./scripts/rotate-secret.sh LEAKED_SECRET "MyApp - Production" "myapp"
    ```
 
 2. **Deploy**: Push update to production
+
    ```bash
    op-env-manager run --vault "MyApp - Production" --item "myapp" -- ./deploy.sh
    ```
@@ -637,6 +751,7 @@ op-env-manager inject --vault "MyApp - Development" --output .env.local
 ### Onboarding delays
 
 **Common bottlenecks**:
+
 - Waiting for 1Password account
 - Waiting for vault access
 - Installation issues
@@ -647,12 +762,14 @@ op-env-manager inject --vault "MyApp - Development" --output .env.local
 # New Team Member Checklist
 
 **Before Day 1** (Team Lead):
+
 - [ ] Create 1Password account
 - [ ] Grant vault access
 - [ ] Add to GitHub team
 - [ ] Send onboarding docs
 
 **Day 1** (New Member):
+
 - [ ] Install 1Password app
 - [ ] Install 1Password CLI
 - [ ] Install op-env-manager
@@ -661,6 +778,7 @@ op-env-manager inject --vault "MyApp - Development" --output .env.local
 - [ ] Verify: npm start
 
 **Day 1** (Team Lead):
+
 - [ ] Pair on first PR
 - [ ] Review secret management workflow
 ```

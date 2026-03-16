@@ -52,11 +52,26 @@ https://developer.1password.com/docs/cli/get-started/
 
 ### 1. Sign In to 1Password
 
+**Option A — Desktop app integration (macOS/Windows/Linux desktop, recommended):**
+
+1. Open the 1Password app
+2. Go to **Settings → Developer** and enable **"Integrate with 1Password CLI"**
+3. On macOS/Windows, also enable Touch ID or Windows Hello under **Settings → Security**
+
+Then run:
+
 ```bash
 op signin
 ```
 
-Follow the prompts to authenticate with your 1Password account.
+**Option B — Headless / server (no desktop app):**
+
+```bash
+op account add --address my.1password.com --email user@example.com
+op signin
+```
+
+For automated environments (CI/CD), use a Service Account token instead (see [Service Accounts](#service-accounts) below).
 
 ### 2. Verify Installation
 
@@ -81,16 +96,19 @@ op item list --vault "Personal"
 ### Basic Workflow
 
 1. **Sign in** (once per session):
+
    ```bash
    op signin
    ```
 
 2. **Push environment variables to 1Password**:
+
    ```bash
    op-env-manager push --vault "Personal" --env .env
    ```
 
 3. **Inject secrets back to a project**:
+
    ```bash
    op-env-manager inject --vault "Personal" --output .env.local
    ```
@@ -197,5 +215,6 @@ export OP_SERVICE_ACCOUNT_TOKEN="your-token"
 ## Support
 
 For issues with:
+
 - **1Password CLI**: https://support.1password.com/
 - **op-env-manager**: https://github.com/matteocervelli/op-env-manager/issues

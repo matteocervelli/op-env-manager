@@ -8,9 +8,15 @@ This document explains the two different approaches for managing environment var
 
 **What it is**: Environment files containing `op://` URIs that reference secrets stored in 1Password items.
 
-**Format**: `VAR_NAME=op://vault/item-name/field`
+**Format**:
+
+- No section: `VAR_NAME=op://vault/item-name/field`
+- With section (op-env-manager generated): `VAR_NAME=op://vault/item-name/$APP_ENV/field`
+
+The `$APP_ENV` form uses a literal shell variable reference. At runtime `op run` expands it from the environment, allowing a single template file to target different sections (e.g., `APP_ENV=dev` vs `APP_ENV=prod`).
 
 **Example**:
+
 ```bash
 # .env.template
 DATABASE_URL=postgresql://user:op://Production/db-password/password@localhost:5432/mydb
@@ -19,24 +25,28 @@ REDIS_PASSWORD=op://Production/redis-creds/password
 ```
 
 **How it works**:
+
 - You create items in 1Password manually or via CLI
 - You write `.env` files with `op://` references pointing to those items
 - You use `op run` or `op inject` to resolve references at runtime
 - Secrets are never stored in plaintext in your `.env` files
 
 **Use cases**:
+
 - Legacy projects already using 1Password CLI workflows
 - Teams standardized on `op run` / `op inject` commands
 - Complex multi-service setups with shared credentials
 - CI/CD pipelines using 1Password Service Accounts
 
 **Pros**:
+
 - Native 1Password CLI workflow
 - Explicit control over item organization in 1Password
 - Can embed references within larger strings (like connection URLs)
 - Works with any 1Password item structure
 
 **Cons**:
+
 - Manual item creation and management
 - Need to track which items/fields exist in 1Password
 - `.env` files are templates, not directly usable
@@ -46,9 +56,10 @@ REDIS_PASSWORD=op://Production/redis-creds/password
 
 **What it is**: A standardized structure where all environment variables are stored as fields in a single 1Password Secure Note item.
 
-**Format**: Single Secure Note with variable names as field labels
+**Format**: Single Secure Note with variable names as field labels (all stored as `[password]` type)
 
 **Example**:
+
 ```bash
 # 1Password Item: "myapp" (Secure Note)
 # Fields:
@@ -57,19 +68,41 @@ REDIS_PASSWORD=op://Production/redis-creds/password
 #   - REDIS_PASSWORD[password] = supersecret
 ```
 
+**Multiline value handling**:
+
+`push` converts literal newlines to `\n` escape sequences before storing in 1Password. `inject` reverses this: it expands `\n` back to actual newlines via `printf '%b'` and wraps the value in double quotes in the output `.env` file.
+
+```bash
+# .env source
+PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----"
+
+# Stored in 1Password as:
+# -----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----
+
+# Injected back to .env as (double-quoted):
+# PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
+# MIIEowIBAAKCAQEA...
+# -----END RSA PRIVATE KEY-----"
+```
+
 **How it works**:
+
 - You push a plaintext `.env` file using `op-env-manager push`
 - Tool creates a Secure Note with each variable as a password field
 - You inject back to `.env` with `op-env-manager inject`
 - You run commands with `op-env-manager run`
 
 **Use cases**:
+
 - New projects starting fresh with 1Password
 - Simple environment variable management
 - Projects with clearly defined environment stages (dev/staging/prod)
 - When you want bidirectional sync between `.env` and 1Password
 
 **Pros**:
+
 - Automated item creation and updates
 - All variables for an environment in one place
 - Easy to see all variables in 1Password UI
@@ -77,22 +110,24 @@ REDIS_PASSWORD=op://Production/redis-creds/password
 - Tagged for easy filtering
 
 **Cons**:
+
 - Less flexible than manual item organization
 - One Secure Note per environment/section
 - Can't embed references in complex strings
+- `inject` only retrieves fields with type `CONCEALED` (password) or `STRING`. Fields of other types added manually to the item are silently skipped.
 
 ## Choosing Between Formats
 
-| Scenario | Recommended Format |
-|----------|-------------------|
-| New project, simple environment variables | **op-env-manager format** |
-| Existing project using `op run` | **Secret references format** |
+| Scenario                                         | Recommended Format           |
+| ------------------------------------------------ | ---------------------------- |
+| New project, simple environment variables        | **op-env-manager format**    |
+| Existing project using `op run`                  | **Secret references format** |
 | Need to embed secrets in URLs/connection strings | **Secret references format** |
-| Want automated bidirectional sync | **op-env-manager format** |
-| Multiple services sharing credentials | **Secret references format** |
-| Clear environment stages (dev/staging/prod) | **op-env-manager format** |
-| CI/CD with 1Password Service Accounts | **Secret references format** |
-| Team already trained on `op inject` | **Secret references format** |
+| Want automated bidirectional sync                | **op-env-manager format**    |
+| Multiple services sharing credentials            | **Secret references format** |
+| Clear environment stages (dev/staging/prod)      | **op-env-manager format**    |
+| CI/CD with 1Password Service Accounts            | **Secret references format** |
+| Team already trained on `op inject`              | **Secret references format** |
 
 ## Converting Between Formats
 
@@ -111,6 +146,7 @@ op-env-manager convert \
 ```
 
 **What happens**:
+
 1. Tool parses `.env.template` line by line
 2. Detects `op://` references in values
 3. Uses `op read` to resolve each reference
@@ -120,12 +156,14 @@ op-env-manager convert \
 **Example**:
 
 Before (`.env.template`):
+
 ```bash
 API_KEY=op://Production/stripe-keys/live_key
 DB_PASSWORD=op://Production/postgres/password
 ```
 
 After (1Password Secure Note "myapp"):
+
 - Field: `API_KEY[password]` = `sk_live_abc123...`
 - Field: `DB_PASSWORD[password]` = `supersecretpassword`
 
@@ -190,6 +228,7 @@ op-env-manager inject \
 ```
 
 **Result in 1Password**:
+
 - Single Secure Note: "myapp"
 - Section "dev" with dev variables
 - Section "prod" with prod variables
@@ -199,11 +238,13 @@ op-env-manager inject \
 ### Secret References Format
 
 **Risks**:
+
 - Template files in repo can reveal infrastructure details
 - Need to ensure references point to correct vault/items
 - Misconfigured references can expose secrets from wrong environment
 
 **Best practices**:
+
 - Keep templates in version control (no secrets)
 - Use vault names that match environments
 - Document required 1Password items/fields
@@ -212,11 +253,13 @@ op-env-manager inject \
 ### op-env-manager Format
 
 **Risks**:
+
 - Need plaintext `.env` temporarily during push
 - Must secure/delete injected files after use
 - All variables in one item (larger blast radius)
 
 **Best practices**:
+
 - Use `--dry-run` before pushing
 - Immediately `chmod 600` on injected files
 - Delete plaintext `.env` after pushing to 1Password

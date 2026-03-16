@@ -49,11 +49,13 @@ op-env-manager performance is primarily bound by:
 **Description**: All field updates are batched into a single `op item edit` call instead of individual API calls per field.
 
 **Impact**:
+
 - **Before**: N API calls for N variables
 - **After**: 1 API call for N variables
 - **Improvement**: 95%+ reduction in API calls
 
 **Implementation**:
+
 ```bash
 # Build all fields into array
 local field_args=()
@@ -76,11 +78,13 @@ op item edit "$item_title" --vault "$VAULT" "${field_args[@]}"
 **Description**: Local file parsing and remote 1Password fetching execute in parallel instead of sequentially.
 
 **Impact**:
+
 - **Before**: Sequential (parse 500ms + fetch 2000ms = 2500ms)
 - **After**: Parallel (max(parse 500ms, fetch 2000ms) = 2000ms)
 - **Improvement**: 30-50% faster for sync/diff operations
 
 **Implementation**:
+
 ```bash
 # Start local parse in background
 {
@@ -101,6 +105,7 @@ wait $local_pid $remote_pid
 **Files**: `lib/sync.sh`, `lib/diff.sh`
 
 **Benefits**:
+
 - Overlaps I/O-bound operations
 - Reduces total wall-clock time
 - Maintains error handling via wait/exit codes
@@ -114,11 +119,13 @@ wait $local_pid $remote_pid
 **Description**: Cache `op item get` results for the duration of a command execution to avoid redundant API calls.
 
 **Impact**:
+
 - **Before**: Multiple `op item get` calls for same item
 - **After**: 1 `op item get` call + cached lookups
 - **Improvement**: 50% reduction in API calls for convert command
 
 **Implementation**:
+
 ```bash
 # Global cache (command-scoped)
 declare -A ITEM_CACHE
@@ -157,11 +164,13 @@ check_item_exists_cached() {
 **Description**: Resolve multiple `op://` references in parallel instead of sequentially.
 
 **Impact**:
+
 - **Before**: Sequential resolution (N × 500ms = 5000ms for 10 refs)
 - **After**: Parallel resolution (max(500ms × concurrent jobs) ≈ 1500ms)
 - **Improvement**: 2-3x faster conversion for files with many references
 
 **Implementation**:
+
 ```bash
 bulk_resolve_op_references() {
     local refs_input="$1"  # Format: "key|op_ref" per line
@@ -196,10 +205,12 @@ bulk_resolve_op_references() {
 **Description**: Automatically retry transient network failures with exponential backoff to handle rate limiting and temporary unavailability.
 
 **Impact**:
+
 - **Reliability**: 99%+ success rate for transient errors
 - **Performance**: Avoids immediate failure on temporary issues
 
 **Configuration**:
+
 ```bash
 export OP_MAX_RETRIES=3           # Default: 3 (range: 0-10)
 export OP_RETRY_DELAY=1           # Default: 1s (range: 0.1-10)
@@ -209,6 +220,7 @@ export OP_RETRY_JITTER=true       # Default: true
 ```
 
 **Retry Sequence** (default):
+
 - Attempt 1: Immediate
 - Attempt 2: ~1s delay
 - Attempt 3: ~2s delay
@@ -226,10 +238,12 @@ export OP_RETRY_JITTER=true       # Default: true
 **Description**: Visual feedback for operations with 100+ variables to improve perceived performance.
 
 **Impact**:
+
 - **UX**: Clear progress indication for large operations
 - **Performance**: No overhead (only updates every N items)
 
 **Configuration**:
+
 ```bash
 export OP_SHOW_PROGRESS=true      # Force enable/disable
 export OP_PROGRESS_THRESHOLD=100  # Default: 100 variables
@@ -244,44 +258,46 @@ export OP_PROGRESS_THRESHOLD=100  # Default: 100 variables
 ### Command Performance (v0.3.0)
 
 All benchmarks performed on:
+
 - **Network**: 50ms latency to 1Password servers
 - **Hardware**: M1 MacBook Pro
 - **OS**: macOS Sonoma
 
 #### Push Command
 
-| Variables | Time   | Notes                              |
-|-----------|--------|------------------------------------|
-| 10        | ~2.0s  | Batch operations already optimized |
-| 50        | ~3.0s  | Single API call for all fields     |
-| 100       | ~4.0s  | Progress bar auto-shows            |
-| 500       | ~8.0s  | Linear scaling                     |
+| Variables | Time  | Notes                              |
+| --------- | ----- | ---------------------------------- |
+| 10        | ~2.0s | Batch operations already optimized |
+| 50        | ~3.0s | Single API call for all fields     |
+| 100       | ~4.0s | Progress bar auto-shows            |
+| 500       | ~8.0s | Linear scaling                     |
 
-*Push command uses batch field operations (single API call)*
+_Push command uses batch field operations (single API call)_
 
 #### Inject Command
 
-| Variables | Time   | Notes                           |
-|-----------|--------|---------------------------------|
-| 10        | ~2.0s  | Single API call to fetch fields |
-| 50        | ~3.0s  | Progress bar auto-shows         |
-| 100       | ~4.0s  | Linear scaling                  |
-| 500       | ~8.0s  | Network-bound                   |
+| Variables | Time  | Notes                           |
+| --------- | ----- | ------------------------------- |
+| 10        | ~2.0s | Single API call to fetch fields |
+| 50        | ~3.0s | Linear scaling                  |
+| 100       | ~4.0s | Progress bar auto-shows         |
+| 500       | ~8.0s | Network-bound                   |
 
 #### Convert Command
 
-| op:// Refs | Time   | Notes                        |
-|------------|--------|------------------------------|
-| 5          | ~3.0s  | Sequential resolution        |
-| 10         | ~5.5s  | Each ref: ~500ms API call    |
-| 20         | ~11.0s | Linear scaling               |
-| 50         | ~27.0s | Optimization planned v0.5.0  |
+| op:// Refs | Time   | Notes                       |
+| ---------- | ------ | --------------------------- |
+| 5          | ~3.0s  | Sequential resolution       |
+| 10         | ~5.5s  | Each ref: ~500ms API call   |
+| 20         | ~11.0s | Linear scaling              |
+| 50         | ~27.0s | Optimization planned v0.5.0 |
 
-*Sequential op read calls (bulk parallelization planned for v0.5.0)*
+_Sequential op read calls (bulk parallelization planned for v0.5.0)_
 
 #### Future Improvements (v0.5.0)
 
 Planned optimizations will improve:
+
 - **Sync/Diff**: 22-24% faster (parallel reads)
 - **Convert**: 34-68% faster (bulk parallel resolution)
 
@@ -300,6 +316,7 @@ Where:
 ```
 
 **Example**:
+
 - 100 variables: 2 + (100 × 0.012) = **3.2 seconds**
 - 500 variables: 2 + (500 × 0.012) = **8 seconds**
 
@@ -318,16 +335,19 @@ Where:
 ```
 
 **Example**:
+
 - 10 references: 2 + (10 × 0.5) = **7 seconds**
 - 50 references: 2 + (50 × 0.5) = **27 seconds**
 
 **v0.5.0 Improvement** (Planned): Parallel bulk resolution will use:
+
 ```
 Time = Base_Overhead + (References / Parallelism × Per_Ref_Cost)
 Where Parallelism ≈ 10-20 (OS-dependent)
 ```
 
 **Example**:
+
 - 20 references: 2 + (20 / 15 × 0.5) ≈ **2.7 seconds**
 - 50 references: 2 + (50 / 15 × 0.5) ≈ **3.7 seconds**
 
@@ -382,6 +402,7 @@ export OP_REQUEST_TIMEOUT=60  # seconds
 #### Symptom: Slow sync/diff operations
 
 **Diagnosis**:
+
 ```bash
 # Enable retry logging
 export OP_RETRY_QUIET=false
@@ -391,34 +412,41 @@ time op read "op://Personal/test/password"
 ```
 
 **Solutions**:
+
 1. Check network latency to 1Password servers
 2. Verify parallel operations are working (check process list during operation)
 3. Ensure retry logic isn't masking persistent failures
 
 #### Symptom: Convert command hangs with many references
 
+**Note**: In v0.3.0 `convert` resolves `op://` references sequentially. Parallel bulk resolution is planned for v0.5.0.
+
 **Diagnosis**:
+
 ```bash
-# Check if parallel jobs are spawned
+# Count active op read processes
 ps aux | grep "op read" | wc -l
 ```
 
 **Solutions**:
-1. Reduce parallelism by running in constrained environment
-2. Check for rate limiting (429 errors in op CLI logs)
-3. Verify references are valid (test individually with `op read`)
+
+1. Check for rate limiting (429 errors in op CLI logs)
+2. Verify references are valid (test individually with `op read`)
+3. For large reference counts, consider splitting the file and converting in batches
 
 #### Symptom: High memory usage
 
 **Current behavior**: Minimal memory footprint due to streaming parsing.
 
 **If experiencing issues**:
+
 ```bash
 # Monitor memory during operation
 /usr/bin/time -l op-env-manager push --vault="Personal" --env-file=.env
 ```
 
 **Expected**:
+
 - Peak memory: <50 MB for 1000 variables
 - No memory leaks (check multiple runs)
 
@@ -427,6 +455,8 @@ ps aux | grep "op read" | wc -l
 ### Optimization Verification
 
 #### Test Parallel Operations
+
+**Note:** Parallel operations are planned for v0.5.0 and not yet implemented. In v0.3.0, sync runs sequentially.
 
 ```bash
 # Enable detailed logging
@@ -442,6 +472,8 @@ set -x
 
 #### Test Caching
 
+**Note:** Item metadata caching is planned for v0.5.0 and not yet implemented. In v0.3.0, there is no `ITEM_CACHE`.
+
 ```bash
 # Enable bash tracing
 bash -x ./bin/op-env-manager convert \
@@ -453,6 +485,8 @@ bash -x ./bin/op-env-manager convert \
 ```
 
 #### Benchmark Comparison
+
+**Note:** This benchmark compares v0.4.0 → v0.5.0 parallel optimization, which is not yet released. Use for future benchmarking once v0.5.0 is available.
 
 ```bash
 # Before optimization (checkout v0.4.0)
@@ -473,6 +507,7 @@ time ./bin/op-env-manager sync --vault="Test" --env-file=large.env --dry-run
 ### For Large Files (500+ variables)
 
 1. **Split by domain** (optional):
+
    ```bash
    # Instead of one 500-variable file:
    # .env.prod (500 vars)
@@ -488,6 +523,7 @@ time ./bin/op-env-manager sync --vault="Test" --env-file=large.env --dry-run
    ```
 
 2. **Use run command** (no temp files):
+
    ```bash
    # Fastest option - no file I/O
    op-env-manager run --vault="Prod" --item="myapp" -- npm run build
@@ -502,6 +538,7 @@ time ./bin/op-env-manager sync --vault="Test" --env-file=large.env --dry-run
 
 1. **Batch references** (automatic in v0.5.0)
 2. **Use dry-run first** to validate references:
+
    ```bash
    op-env-manager convert --env-file=.env.legacy --vault="Personal" --dry-run
    ```
@@ -514,16 +551,19 @@ time ./bin/op-env-manager sync --vault="Test" --env-file=large.env --dry-run
 ### For CI/CD Environments
 
 1. **Use Service Account tokens** (faster auth):
+
    ```bash
    export OP_SERVICE_ACCOUNT_TOKEN="${{ secrets.OP_TOKEN }}"
    ```
 
 2. **Enable quiet mode**:
+
    ```bash
    export OP_QUIET_MODE=true
    ```
 
 3. **Configure retry for flaky networks**:
+
    ```bash
    export OP_MAX_RETRIES=5
    export OP_RETRY_DELAY=2
@@ -596,6 +636,7 @@ For performance-related questions or issues:
 5. **Open issue**: [GitHub Issues](https://github.com/yourusername/op-env-manager/issues)
 
 **Include in bug reports**:
+
 - Command used
 - File size (number of variables)
 - Network latency: `time op read "op://vault/item/field"`
