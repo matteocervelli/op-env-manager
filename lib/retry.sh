@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source logger if not already loaded
 if ! declare -f log_error &>/dev/null; then
-    # shellcheck source=lib/logger.sh
+    # shellcheck source=/dev/null
     source "$SCRIPT_DIR/logger.sh"
 fi
 
@@ -354,7 +354,7 @@ retry_with_backoff() {
 
     # Should never reach here, but defensive
     echo "$output" >&2
-    return $exit_code
+    return "$exit_code"
 }
 
 # Export functions for use in other scripts

@@ -6,8 +6,11 @@ set -eo pipefail
 
 # Get script directory
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
 source "$LIB_DIR/logger.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/error_helpers.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/retry.sh"
 
 # Global variables for standalone command

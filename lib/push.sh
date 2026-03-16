@@ -6,9 +6,13 @@ set -eo pipefail
 
 # Get script directory
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
 source "$LIB_DIR/logger.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/error_helpers.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/retry.sh"
+# shellcheck source=/dev/null
 source "$LIB_DIR/progress.sh"
 
 # Global variables
@@ -293,8 +297,7 @@ push_to_1password() {
         local result
         if [ "$item_exists" = true ]; then
             # Update existing item - process all fields at once
-            result=$(retry_with_backoff "update item with fields" op item edit "$item_title" --vault "$VAULT" "${field_args[@]}" 2>&1)
-            if [ $? -ne 0 ]; then
+            if ! result=$(retry_with_backoff "update item with fields" op item edit "$item_title" --vault "$VAULT" "${field_args[@]}" 2>&1); then
                 echo ""
                 log_error "Failed to update item in 1Password"
                 echo ""
@@ -318,12 +321,11 @@ push_to_1password() {
         else
             # Create new item with first field, then add rest with edit
             log_info "Creating item..."
-            result=$(retry_with_backoff "create new item" op item create --category="Secure Note" \
+            if ! result=$(retry_with_backoff "create new item" op item create --category="Secure Note" \
                 --title="$item_title" \
                 --vault="$VAULT" \
                 --tags="op-env-manager" \
-                "${field_args[0]}" < /dev/null 2>&1)
-            if [ $? -ne 0 ]; then
+                "${field_args[0]}" < /dev/null 2>&1); then
                 echo ""
                 log_error "Failed to create item in 1Password"
                 echo ""
@@ -352,8 +354,7 @@ push_to_1password() {
             if [ ${#field_args[@]} -gt 1 ]; then
                 log_info "Adding remaining fields..."
                 local remaining_fields=("${field_args[@]:1}")
-                result=$(retry_with_backoff "add remaining fields" op item edit "$item_title" --vault "$VAULT" "${remaining_fields[@]}" 2>&1)
-                if [ $? -ne 0 ]; then
+                if ! result=$(retry_with_backoff "add remaining fields" op item edit "$item_title" --vault "$VAULT" "${remaining_fields[@]}" 2>&1); then
                     echo ""
                     log_error "Failed to add remaining fields to item"
                     echo ""
@@ -387,6 +388,7 @@ push_to_1password() {
             log_step "Generating template file: $TEMPLATE_OUTPUT"
 
             # Source template generation functions
+            # shellcheck source=/dev/null
             source "$LIB_DIR/template.sh"
 
             # Collect field names from what we just pushed
