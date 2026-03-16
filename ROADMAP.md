@@ -2,7 +2,7 @@
 
 This document outlines the planned features, improvements, and long-term vision for op-env-manager.
 
-**Current Version**: 0.3.1
+**Current Version**: 0.3.0
 **Last Updated**: 2026-03-16
 
 ---

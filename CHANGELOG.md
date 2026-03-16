@@ -5,6 +5,24 @@ All notable changes to op-env-manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+#### Documentation
+
+- **docs/user-guide/**: New user guide directory with `getting-started.md` and index (`README.md`)
+- **docs/docs-registry.yaml**: New registry tracking all 8 user-facing docs with status and version links
+- **docs/QUICKSTART.md**: Comprehensive flags reference updated — added `--quiet/-q` global flag, `--section`, `--template`, `--template-output`, `--no-masking`; added missing init/diff/sync/convert/template command subsections; corrected `--env` → `--env-file`
+- **docs/1PASSWORD_SETUP.md**: Sign-in section split into desktop app integration vs headless/server paths
+- **docs/1password-formats.md**: Added `$APP_ENV` dynamic reference format, multiline value round-trip documentation, silent field-type filtering behavior
+- **docs/CI_CD_EXAMPLES.md**: Added `--quiet` flag to all CircleCI, GitHub Actions, GitLab CI, Jenkins pipeline examples; added `--overwrite` to Docker inject examples
+- **docs/CONVERT_FEATURE.md**: Corrected `--env` → `--env-file` throughout; fixed create-vs-overwrite accuracy for existing items; added `--template`/`--template-output` flags
+- **docs/TEAM_COLLABORATION.md**: Added Diff and Sync Workflows section covering `diff`, `sync` strategies, interactive conflict prompts, state file, and `.gitignore` recommendations
+- **docs/PERFORMANCE.md**: Fixed inject benchmark table (threshold 100, not 50); added `**Note:**` disclaimers to v0.5.0 verification sections; fixed misleading "reduce parallelism" troubleshooting
+
+---
+
 ## [0.3.0] - 2025-01-14
 
 ### Added - Interactive Setup & User Experience
@@ -217,55 +235,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Example .env file with 50+ common variables
 - Migration path from legacy scripts
 - Archive of old scripts for reference
-
----
-
-## [Unreleased]
-
-### Changed
-
-#### Documentation
-
-- **docs/user-guide/**: New user guide directory with `getting-started.md` and index (`README.md`)
-- **docs/docs-registry.yaml**: New registry tracking all 8 user-facing docs with status and version links
-- **docs/QUICKSTART.md**: Comprehensive flags reference updated — added `--quiet/-q` global flag, `--section`, `--template`, `--template-output`, `--no-masking`; added missing init/diff/sync/convert/template command subsections; corrected `--env` → `--env-file`
-- **docs/1PASSWORD_SETUP.md**: Sign-in section split into desktop app integration vs headless/server paths
-- **docs/1password-formats.md**: Added `$APP_ENV` dynamic reference format, multiline value round-trip documentation, silent field-type filtering behavior
-- **docs/CI_CD_EXAMPLES.md**: Added `--quiet` flag to all CircleCI, GitHub Actions, GitLab CI, Jenkins pipeline examples; added `--overwrite` to Docker inject examples
-- **docs/CONVERT_FEATURE.md**: Corrected `--env` → `--env-file` throughout; fixed create-vs-overwrite accuracy for existing items; added `--template`/`--template-output` flags
-- **docs/TEAM_COLLABORATION.md**: Added Diff and Sync Workflows section covering `diff`, `sync` strategies, interactive conflict prompts, state file, and `.gitignore` recommendations
-- **docs/PERFORMANCE.md**: Fixed inject benchmark table (threshold 100, not 50); added `**Note:**` disclaimers to v0.5.0 verification sections; fixed misleading "reduce parallelism" troubleshooting
-
-### Planned Features
-
-#### v0.4.0
-
-- [ ] `diff` command - Compare local .env with 1Password
-- [ ] `sync` command - Bidirectional sync with conflict resolution
-- [ ] Enhanced logging with verbosity levels
-
-#### v0.5.0
-
-- [ ] Performance optimizations (parallel operations, caching)
-- [ ] Batch field operations optimization
-- [ ] Performance benchmarking and documentation
-
-#### v1.0.0
-
-- [ ] `rotate` command - Generate new secrets and update
-- [ ] Support for .env.schema validation
-- [ ] Homebrew tap for easier installation
-- [ ] Docker image for CI/CD usage
-- [ ] GitHub Action for workflows
-
-#### Future Considerations
-
-- Multi-vault injection (merge from multiple vaults)
-- Secret expiration warnings
-- Audit trail logging
-- Integration with other secret managers
-- GUI wrapper or TUI interface
-- VSCode extension
 
 ---
 

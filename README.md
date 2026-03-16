@@ -19,8 +19,8 @@ by [Matteo Cervelli](https://github.com/matteocervelli)
 - **Push**: Upload your `.env` variables to 1Password for secure storage
 - **Inject**: Download secrets from 1Password into local `.env` files
 - **Run**: Execute commands with secrets injected from 1Password (no plaintext files!)
-- **Diff**: Compare local `.env` with 1Password to identify differences (v0.3.1+)
-- **Sync**: Bidirectional synchronization with intelligent conflict resolution (v0.3.1+)
+- **Diff**: Compare local `.env` with 1Password to identify differences (v0.3.0+)
+- **Sync**: Bidirectional synchronization with intelligent conflict resolution (v0.3.0+)
 - **Convert**: Migrate legacy `.env` files with `op://` references to op-env-manager format
 - **Template**: Generate `.env.op` files with `op://` references for version control
 
